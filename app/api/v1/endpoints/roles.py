@@ -15,8 +15,9 @@ def list_roles(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_admin),
 ):
-    """List all roles (public for dropdown population)."""
+    """List all roles. Admin only."""
     roles = db.scalars(select(Role).offset(skip).limit(limit)).all()
     return roles
 
@@ -25,8 +26,9 @@ def list_roles(
 def get_role(
     role_id: int,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_admin),
 ):
-    """Get a single role by ID."""
+    """Get a single role by ID. Admin only."""
     role = db.scalar(select(Role).where(Role.id == role_id))
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")

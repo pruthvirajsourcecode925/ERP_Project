@@ -106,16 +106,152 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db), c
 
 @router.get("/", response_model=list[UserResponse])
 def list_users(
+    username: str | None = None,
+    role: str | None = None,
+    is_locked: bool | None = None,
+    auth_provider: str | None = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin),
 ):
-    """List all active (non-deleted) users. Admin only."""
-    users = db.scalars(
-        select(User).where(User.is_deleted.is_(False)).offset(skip).limit(limit)
-    ).all()
+    """List non-deleted users with optional filters. Admin only."""
+    stmt = select(User).where(User.is_deleted.is_(False))
+
+    if username:
+        stmt = stmt.where(User.username.ilike(f"%{username}%"))
+
+    if role:
+        role_obj = db.scalar(select(Role).where(Role.name == role))
+        if not role_obj:
+            return []
+        stmt = stmt.where(User.role_id == role_obj.id)
+
+    if is_locked is not None:
+        stmt = stmt.where(User.is_locked == is_locked)
+
+    if auth_provider:
+        if auth_provider not in {"local", "google", "both"}:
+            raise HTTPException(status_code=400, detail="Invalid auth_provider. Use one of: local, google, both")
+        stmt = stmt.where(User.auth_provider == auth_provider)
+
+    users = db.scalars(stmt.offset(skip).limit(limit)).all()
     return users
+
+
+@router.post("/{user_id}/unlock", response_model=UserResponse)
+def unlock_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin),
+):
+    db_user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.is_locked = False
+    db_user.failed_attempts = 0
+    db_user.updated_by = current_user.id
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    add_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_UNLOCKED",
+        table_name="users",
+        record_id=db_user.id,
+        new_value={"is_locked": False, "failed_attempts": 0},
+    )
+    return db_user
+
+
+@router.post("/{user_id}/disable", response_model=UserResponse)
+def disable_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin),
+):
+    db_user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot disable yourself")
+
+    db_user.is_active = False
+    db_user.updated_by = current_user.id
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    add_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_DISABLED",
+        table_name="users",
+        record_id=db_user.id,
+        new_value={"is_active": False},
+    )
+    return db_user
+
+
+@router.post("/{user_id}/enable", response_model=UserResponse)
+def enable_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin),
+):
+    db_user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db_user.is_active = True
+    db_user.updated_by = current_user.id
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    add_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_ENABLED",
+        table_name="users",
+        record_id=db_user.id,
+        new_value={"is_active": True},
+    )
+    return db_user
+
+
+@router.post("/{user_id}/soft-delete", response_model=UserResponse)
+def soft_delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin),
+):
+    db_user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot soft-delete yourself")
+
+    db_user.is_deleted = True
+    db_user.is_active = False
+    db_user.updated_by = current_user.id
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    add_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_SOFT_DELETED",
+        table_name="users",
+        record_id=db_user.id,
+        old_value={"username": db_user.username, "email": db_user.email},
+        new_value={"is_deleted": True, "is_active": False},
+    )
+    return db_user
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

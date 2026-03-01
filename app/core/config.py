@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "AS9100D ERP Backend"
     API_V1_PREFIX: str = "/api/v1"
 
-    DATABASE_URL: str = "postgresql+pg8000://postgres:Root123@localhost:5433/as9100d_erp"
+    DATABASE_URL: str = "postgresql+pg8000://postgres:password@localhost:5433/as9100d_erp"
 
     JWT_SECRET_KEY: str = "change_me"
     JWT_ALGORITHM: str = "HS256"
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     GOOGLE_ADMIN_EMAILS: str | None = None
     ADMIN_BOOTSTRAP_USERNAME: str = "admin"
     ADMIN_BOOTSTRAP_EMAIL: str = "admin@example.com"
-    ADMIN_BOOTSTRAP_PASSWORD: str = "Admin@12345"
+    ADMIN_BOOTSTRAP_PASSWORD: str = "change_me_admin_password"
 
 
 settings = Settings()

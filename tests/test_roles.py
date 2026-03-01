@@ -1,36 +1,45 @@
 import random
 from fastapi.testclient import TestClient
+from sqlalchemy import select
+
 from app.main import app
+from app.core.security import create_access_token
+from app.core.security import get_password_hash
+from app.db.session import SessionLocal
+from app.models.role import Role
+from app.models.user import User
 
 client = TestClient(app)
 
 
 def get_admin_token() -> str:
-    """Helper to get admin auth token."""
-    uid = random.randint(10000, 99999)
-    username = f"adminuser{uid}"
-    password = "Admin@12345"
-    create_resp = client.post(
-        "/api/v1/users/",
-        json={
-            "username": username,
-            "email": f"{username}@example.com",
-            "password": password,
-            "role": "Admin",
-        },
-    )
-    assert create_resp.status_code == 200
+    """Helper to get bootstrap admin auth token."""
+    db = SessionLocal()
+    admin_id = None
+    try:
+        admin = db.scalar(select(User).where(User.username == "admin"))
+        admin_role = db.scalar(select(Role).where(Role.name == "Admin"))
+        if admin and admin_role:
+            admin.password_hash = get_password_hash("Admin@12345")
+            admin.role_id = admin_role.id
+            admin.is_active = True
+            admin.is_locked = False
+            admin.failed_attempts = 0
+            admin.auth_provider = "both"
+            db.add(admin)
+            db.commit()
+            admin_id = admin.id
+    finally:
+        db.close()
 
-    resp = client.post(
-        "/api/v1/auth/login",
-        json={"username": username, "password": password},
-    )
-    return resp.json()["access_token"]
+    assert admin_id is not None
+    return create_access_token(str(admin_id))
 
 
 def test_list_roles():
-    """Test listing all roles (public endpoint)."""
-    response = client.get("/api/v1/roles/")
+    """Test listing all roles (admin only)."""
+    token = get_admin_token()
+    response = client.get("/api/v1/roles/", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     roles = response.json()
     assert isinstance(roles, list)
@@ -40,7 +49,8 @@ def test_list_roles():
 
 def test_get_role():
     """Test getting a single role by ID."""
-    response = client.get("/api/v1/roles/1")
+    token = get_admin_token()
+    response = client.get("/api/v1/roles/1", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     role = response.json()
     assert "id" in role
@@ -49,7 +59,8 @@ def test_get_role():
 
 def test_get_role_not_found():
     """Test getting a non-existent role."""
-    response = client.get("/api/v1/roles/99999")
+    token = get_admin_token()
+    response = client.get("/api/v1/roles/99999", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 404
 
 
@@ -123,7 +134,7 @@ def test_deactivate_role():
     assert response.status_code == 204
 
     # Verify it's deactivated
-    get_resp = client.get(f"/api/v1/roles/{role_id}")
+    get_resp = client.get(f"/api/v1/roles/{role_id}", headers={"Authorization": f"Bearer {token}"})
     assert get_resp.json()["is_active"] is False
 
 
