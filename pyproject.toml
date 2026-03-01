@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "as9100d-erp-backend"
+version = "0.1.0"
+description = "AS9100D Manufacturing ERP System Backend"
+authors = ["Pruthviraj Rajput <rajputpruthviraj17@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.75.0"
+uvicorn = "^0.17.0"
+sqlalchemy = "^1.4.27"
+psycopg2-binary = "^2.9.1"
+pydantic = "^1.8.2"
+python-jose = "^3.3.0"
+alembic = "^1.7.5"
+redis = "^5.2.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
