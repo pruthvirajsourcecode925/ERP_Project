@@ -118,6 +118,31 @@ Environment variables:
 - `AUTH_RATE_LIMIT_BACKEND` (`memory` or `redis`)
 - `AUTH_RATE_LIMIT_REDIS_URL` (required when backend is `redis`)
 
+## Documentation
+
+- Sales ER Diagram: [docs/sales-erd.md](docs/sales-erd.md)
+
+## Sales Contract Review Gate (Backend)
+
+Quotation creation and quotation PDF download are blocked unless all 5 contract-review checks are `True`.
+
+Business label to backend field mapping:
+- `drawing_available` -> `scope_clarity_ok`
+- `special_process_identified` -> `capability_ok`
+- `capacity_ok` -> `capacity_ok`
+- `delivery_feasible` -> `delivery_commitment_ok`
+- `quality_requirements_clear` -> `quality_requirements_ok`
+
+If any check is `False`, the API responds with HTTP 400 and a clear message listing which checkbox names must be set to `Yes/True`.
+
+Example 400 response:
+
+```json
+{
+   "detail": "Quotation cannot be generated due to incomplete contract review.\n\nThe following feasibility items are not approved:\n• Drawing availability\n• Delivery feasibility\n\nPlease resolve the above issues before generating quotation."
+}
+```
+
 ## Testing
 
 Unit tests are included for both authentication and user management. To run the tests, use:
