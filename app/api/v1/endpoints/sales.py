@@ -485,6 +485,20 @@ def create_customer_po_review(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Sales", "Admin")),
 ):
+    quotation = db.scalar(
+        select(Quotation).where(
+            Quotation.id == payload.quotation_id,
+            Quotation.is_deleted.is_(False),
+        )
+    )
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    try:
+        validate_contract_review_for_quotation(db, quotation.contract_review_id)
+    except SalesBusinessRuleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     po_review = CustomerPOReview(
         document_number=_generate_document_number(db, "POA", CustomerPOReview),
         revision=0,
@@ -534,6 +548,11 @@ def download_customer_po_review_pdf(
     quotation = po_review.quotation
     if not quotation:
         raise HTTPException(status_code=400, detail="Quotation not found for PO review")
+
+    try:
+        validate_contract_review_for_quotation(db, quotation.contract_review_id)
+    except SalesBusinessRuleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     customer = quotation.customer
     enquiry = quotation.enquiry

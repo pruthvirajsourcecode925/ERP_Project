@@ -145,6 +145,75 @@ def _seed_sales_records(
         db.close()
 
 
+def _seed_sales_upto_quotation(
+    *,
+    contract_status: ContractReviewStatus,
+    all_checks_true: bool,
+) -> tuple[int, int, int, int]:
+    db = SessionLocal()
+    try:
+        code = random.randint(10000, 99999)
+
+        customer = Customer(
+            customer_code=f"CUST{code}",
+            name=f"Customer {code}",
+            email=f"customer{code}@example.com",
+            is_active=True,
+        )
+        db.add(customer)
+        db.flush()
+
+        enquiry = Enquiry(
+            enquiry_number=f"ENQ{code}",
+            customer_id=customer.id,
+            enquiry_date=date.today(),
+            currency="INR",
+            status=EnquiryStatus.DRAFT,
+        )
+        db.add(enquiry)
+        db.flush()
+
+        contract_review = ContractReview(
+            document_number=f"CR-{date.today().year}-{code:04d}",
+            revision=0,
+            generated_at=datetime.utcnow(),
+            generated_by=None,
+            enquiry_id=enquiry.id,
+            status=contract_status,
+            scope_clarity_ok=all_checks_true,
+            capability_ok=all_checks_true,
+            capacity_ok=all_checks_true,
+            delivery_commitment_ok=all_checks_true,
+            quality_requirements_ok=all_checks_true,
+        )
+        db.add(contract_review)
+        db.flush()
+
+        quotation = Quotation(
+            document_number=f"QT-{date.today().year}-{code:04d}",
+            revision=0,
+            generated_at=datetime.utcnow(),
+            generated_by=None,
+            quotation_number=f"QTN{code}",
+            enquiry_id=enquiry.id,
+            contract_review_id=contract_review.id,
+            customer_id=customer.id,
+            issue_date=date.today(),
+            valid_until=date.today(),
+            currency="INR",
+            subtotal=Decimal("100.00"),
+            tax_amount=Decimal("18.00"),
+            total_amount=Decimal("118.00"),
+            status=QuotationStatus.DRAFT,
+        )
+        db.add(quotation)
+        db.commit()
+
+        return customer.id, enquiry.id, contract_review.id, quotation.id
+    finally:
+        db.close()
+
+
 def test_cannot_create_quotation_if_feasibility_checkbox_false():
     token = _get_token_for_role("Sales")
     customer_id, enquiry_id, contract_review_id, _, _ = _seed_sales_records(
@@ -366,6 +435,53 @@ def test_customer_po_review_pdf_download_success():
     assert response.status_code == 200
     assert response.headers.get("content-type", "").startswith("application/pdf")
     assert response.content[:4] == b"%PDF"
+
+
+def test_cannot_create_customer_po_review_if_feasibility_checkbox_false():
+    token = _get_token_for_role("Sales")
+    _, _, _, quotation_id = _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=False,
+    )
+
+    response = client.post(
+        "/api/v1/sales/customer-po-review",
+        json={
+            "quotation_id": quotation_id,
+            "customer_po_number": f"PO{random.randint(10000, 99999)}",
+            "customer_po_date": str(date.today()),
+            "accepted": False,
+            "status": "pending",
+            "deviation_notes": "Pending contract closure",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "quotation cannot be generated due to incomplete contract review" in detail.lower()
+    assert "the following feasibility items are not approved" in detail.lower()
+    assert "• Drawing availability" in detail
+
+
+def test_customer_po_review_pdf_download_blocked_if_feasibility_checkbox_false():
+    token = _get_token_for_role("Sales")
+    _, _, _, _, po_review_id = _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=False,
+        po_accepted=True,
+    )
+
+    response = client.get(
+        f"/api/v1/sales/customer-po-review/{po_review_id}/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "quotation cannot be generated due to incomplete contract review" in detail.lower()
+    assert "the following feasibility items are not approved" in detail.lower()
+    assert "• Drawing availability" in detail
 
 
 def test_admin_can_update_quotation_terms():
