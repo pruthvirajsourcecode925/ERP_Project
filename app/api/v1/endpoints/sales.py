@@ -7,7 +7,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -308,18 +308,24 @@ def create_enquiry(
 
 @router.get("/enquiry", response_model=list[EnquiryOut])
 def list_enquiries(
+    q: str | None = Query(None, min_length=1),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Sales", "Admin")),
 ):
-    enquiries = db.scalars(
-        select(Enquiry)
-        .where(Enquiry.is_deleted.is_(False))
-        .order_by(Enquiry.id.desc())
-        .offset(skip)
-        .limit(limit)
-    ).all()
+    stmt = select(Enquiry).where(Enquiry.is_deleted.is_(False))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                Enquiry.enquiry_number.ilike(pattern),
+                Enquiry.currency.ilike(pattern),
+                Enquiry.notes.ilike(pattern),
+            )
+        )
+
+    enquiries = db.scalars(stmt.order_by(Enquiry.id.desc()).offset(skip).limit(limit)).all()
     return enquiries
 
 
@@ -401,6 +407,29 @@ def create_quotation_endpoint(
         new_value={"quotation_number": quotation.quotation_number, "enquiry_id": quotation.enquiry_id},
     )
     return quotation
+
+
+@router.get("/quotation", response_model=list[QuotationOut])
+def list_quotations(
+    q: str | None = Query(None, min_length=1),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Sales", "Admin")),
+):
+    stmt = select(Quotation).where(Quotation.is_deleted.is_(False))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                Quotation.quotation_number.ilike(pattern),
+                Quotation.document_number.ilike(pattern),
+                Quotation.currency.ilike(pattern),
+            )
+        )
+
+    quotations = db.scalars(stmt.order_by(Quotation.id.desc()).offset(skip).limit(limit)).all()
+    return quotations
 
 
 @router.get("/quotation/{quotation_id}/download")
@@ -528,6 +557,28 @@ def create_customer_po_review(
         new_value={"quotation_id": po_review.quotation_id, "accepted": po_review.accepted},
     )
     return po_review
+
+
+@router.get("/customer-po-review", response_model=list[CustomerPOReviewOut])
+def list_customer_po_reviews(
+    q: str | None = Query(None, min_length=1),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Sales", "Admin")),
+):
+    stmt = select(CustomerPOReview).where(CustomerPOReview.is_deleted.is_(False))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                CustomerPOReview.customer_po_number.ilike(pattern),
+                CustomerPOReview.document_number.ilike(pattern),
+            )
+        )
+
+    po_reviews = db.scalars(stmt.order_by(CustomerPOReview.id.desc()).offset(skip).limit(limit)).all()
+    return po_reviews
 
 
 @router.get("/customer-po-review/{po_review_id}/download")
@@ -680,3 +731,25 @@ def create_sales_order_endpoint(
         new_value={"sales_order_number": sales_order.sales_order_number},
     )
     return sales_order
+
+
+@router.get("/sales-order", response_model=list[SalesOrderOut])
+def list_sales_orders(
+    q: str | None = Query(None, min_length=1),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Sales", "Admin")),
+):
+    stmt = select(SalesOrder).where(SalesOrder.is_deleted.is_(False))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                SalesOrder.sales_order_number.ilike(pattern),
+                SalesOrder.currency.ilike(pattern),
+            )
+        )
+
+    sales_orders = db.scalars(stmt.order_by(SalesOrder.id.desc()).offset(skip).limit(limit)).all()
+    return sales_orders

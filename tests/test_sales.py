@@ -66,10 +66,11 @@ def _seed_sales_records(
     contract_status: ContractReviewStatus,
     all_checks_true: bool,
     po_accepted: bool,
+    seed_code: int | None = None,
 ) -> tuple[int, int, int, int, int]:
     db = SessionLocal()
     try:
-        code = random.randint(10000, 99999)
+        code = seed_code or random.randint(10000, 99999)
 
         customer = Customer(
             customer_code=f"CUST{code}",
@@ -149,10 +150,11 @@ def _seed_sales_upto_quotation(
     *,
     contract_status: ContractReviewStatus,
     all_checks_true: bool,
+    seed_code: int | None = None,
 ) -> tuple[int, int, int, int]:
     db = SessionLocal()
     try:
-        code = random.randint(10000, 99999)
+        code = seed_code or random.randint(10000, 99999)
 
         customer = Customer(
             customer_code=f"CUST{code}",
@@ -590,3 +592,211 @@ def test_quotation_pdf_download_lists_only_failed_feasibility_items():
     assert "• Special processes" not in detail
     assert "• Capacity & machine suitability" not in detail
     assert "• Quality requirements (FAI, COC, Traceability)" not in detail
+
+
+def test_list_enquiries_supports_search_and_pagination():
+    token = _get_token_for_role("Sales")
+    base = random.randint(60000, 69990)
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base,
+    )
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base + 1,
+    )
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base + 2,
+    )
+
+    search_response = client.get(
+        "/api/v1/sales/enquiry",
+        params={"q": f"ENQ{base + 1}", "skip": 0, "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert search_response.status_code == 200
+    search_data = search_response.json()
+    assert any(item["enquiry_number"] == f"ENQ{base + 1}" for item in search_data)
+
+    page_response = client.get(
+        "/api/v1/sales/enquiry",
+        params={"skip": 0, "limit": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert page_response.status_code == 200
+    assert len(page_response.json()) <= 2
+
+
+def test_list_quotations_supports_search_and_pagination():
+    token = _get_token_for_role("Sales")
+    base = random.randint(70000, 79990)
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base,
+    )
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base + 1,
+    )
+    _seed_sales_upto_quotation(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        seed_code=base + 2,
+    )
+
+    search_response = client.get(
+        "/api/v1/sales/quotation",
+        params={"q": f"QTN{base + 1}", "skip": 0, "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert search_response.status_code == 200
+    search_data = search_response.json()
+    assert any(item["quotation_number"] == f"QTN{base + 1}" for item in search_data)
+
+    page_response = client.get(
+        "/api/v1/sales/quotation",
+        params={"skip": 0, "limit": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert page_response.status_code == 200
+    assert len(page_response.json()) <= 2
+
+
+def test_list_customer_po_reviews_supports_search_and_pagination():
+    token = _get_token_for_role("Sales")
+    base = random.randint(80000, 89990)
+    _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base,
+    )
+    _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base + 1,
+    )
+    _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base + 2,
+    )
+
+    search_response = client.get(
+        "/api/v1/sales/customer-po-review",
+        params={"q": f"PO{base + 1}", "skip": 0, "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert search_response.status_code == 200
+    search_data = search_response.json()
+    assert any(item["customer_po_number"] == f"PO{base + 1}" for item in search_data)
+
+    page_response = client.get(
+        "/api/v1/sales/customer-po-review",
+        params={"skip": 0, "limit": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert page_response.status_code == 200
+    assert len(page_response.json()) <= 2
+
+
+def test_list_sales_orders_supports_search_and_pagination():
+    token = _get_token_for_role("Sales")
+    base = random.randint(90000, 99990)
+
+    customer_id, enquiry_id, contract_review_id, quotation_id, po_review_id = _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base,
+    )
+    create_one = client.post(
+        "/api/v1/sales/sales-order",
+        json={
+            "sales_order_number": f"SO{base}",
+            "customer_id": customer_id,
+            "enquiry_id": enquiry_id,
+            "contract_review_id": contract_review_id,
+            "quotation_id": quotation_id,
+            "customer_po_review_id": po_review_id,
+            "order_date": str(date.today()),
+            "currency": "INR",
+            "total_amount": "118.00",
+            "status": "draft",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_one.status_code == 201
+
+    customer_id, enquiry_id, contract_review_id, quotation_id, po_review_id = _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base + 1,
+    )
+    create_two = client.post(
+        "/api/v1/sales/sales-order",
+        json={
+            "sales_order_number": f"SO{base + 1}",
+            "customer_id": customer_id,
+            "enquiry_id": enquiry_id,
+            "contract_review_id": contract_review_id,
+            "quotation_id": quotation_id,
+            "customer_po_review_id": po_review_id,
+            "order_date": str(date.today()),
+            "currency": "INR",
+            "total_amount": "118.00",
+            "status": "draft",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_two.status_code == 201
+
+    customer_id, enquiry_id, contract_review_id, quotation_id, po_review_id = _seed_sales_records(
+        contract_status=ContractReviewStatus.APPROVED,
+        all_checks_true=True,
+        po_accepted=True,
+        seed_code=base + 2,
+    )
+    create_three = client.post(
+        "/api/v1/sales/sales-order",
+        json={
+            "sales_order_number": f"SO{base + 2}",
+            "customer_id": customer_id,
+            "enquiry_id": enquiry_id,
+            "contract_review_id": contract_review_id,
+            "quotation_id": quotation_id,
+            "customer_po_review_id": po_review_id,
+            "order_date": str(date.today()),
+            "currency": "INR",
+            "total_amount": "118.00",
+            "status": "draft",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_three.status_code == 201
+
+    search_response = client.get(
+        "/api/v1/sales/sales-order",
+        params={"q": f"SO{base + 1}", "skip": 0, "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert search_response.status_code == 200
+    search_data = search_response.json()
+    assert any(item["sales_order_number"] == f"SO{base + 1}" for item in search_data)
+
+    page_response = client.get(
+        "/api/v1/sales/sales-order",
+        params={"skip": 0, "limit": 2},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert page_response.status_code == 200
+    assert len(page_response.json()) <= 2
