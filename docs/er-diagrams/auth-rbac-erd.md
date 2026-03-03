@@ -71,3 +71,8 @@ erDiagram
 ## Notes
 - `oauth_states` is standalone state-tracking for OAuth flow (no FK to users).
 - `role_module_access` enables multi-module permissions per role.
+
+## Navigation
+- Previous: [Purchase ERD](purchase-erd.md)
+- Next: [Engineering ERD](engineering-erd.md)
+- Index: [ER Diagram Index](index.md)

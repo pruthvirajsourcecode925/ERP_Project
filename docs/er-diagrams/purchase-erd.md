@@ -69,3 +69,8 @@ erDiagram
 - `purchase_orders.status` lifecycle: `draft -> issued -> closed`.
 - `purchase_order_items` are editable only while PO is in `draft`.
 - `total_amount` is recalculated from non-deleted PO items.
+
+## Navigation
+- Previous: [Sales ERD](sales-erd.md)
+- Next: [Auth & RBAC ERD](auth-rbac-erd.md)
+- Index: [ER Diagram Index](index.md)

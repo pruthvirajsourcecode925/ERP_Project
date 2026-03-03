@@ -84,3 +84,8 @@ erDiagram
         text remarks
     }
 ```
+
+## Navigation
+- Previous: [Auth & RBAC ERD](auth-rbac-erd.md)
+- Next: [Sales ERD](sales-erd.md)
+- Index: [ER Diagram Index](index.md)
