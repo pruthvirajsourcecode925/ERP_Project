@@ -68,17 +68,28 @@ def _create_supplier(token: str, *, is_approved: bool = False) -> dict:
     return resp.json()
 
 
-def _approve_supplier(token: str, supplier_id: int) -> dict:
+def _approve_supplier(
+    token: str,
+    supplier_id: int,
+    *,
+    approved: bool = True,
+    approval_remarks: str | None = "AS9100D 8.4 quality requirements acknowledged",
+    quality_acknowledged: bool | None = True,
+) -> dict:
     resp = client.post(
         f"/api/v1/purchase/supplier/{supplier_id}/approve",
-        json={"approved": True},
+        json={
+            "approved": approved,
+            "approval_remarks": approval_remarks,
+            "quality_acknowledged": quality_acknowledged,
+        },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200, resp.text
     return resp.json()
 
 
-def _create_po(token: str, supplier_id: int) -> dict:
+def _create_po(token: str, supplier_id: int, *, quality_notes: str = "Supplier quality clauses acknowledged") -> dict:
     resp = client.post(
         "/api/v1/purchase/order",
         json={
@@ -86,6 +97,7 @@ def _create_po(token: str, supplier_id: int) -> dict:
             "po_date": date.today().isoformat(),
             "expected_delivery_date": None,
             "remarks": "Test PO",
+            "quality_notes": quality_notes,
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -180,6 +192,58 @@ def test_purchase_supplier_approve():
     assert approved["is_approved"] is True
 
 
+def test_purchase_supplier_approve_requires_quality_acknowledged_true():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=False)
+
+    resp = client.post(
+        f"/api/v1/purchase/supplier/{supplier['id']}/approve",
+        json={
+            "approved": True,
+            "approval_remarks": "Quality reviewed",
+            "quality_acknowledged": False,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "Quality acknowledgment must be True" in resp.json()["detail"]
+
+
+def test_purchase_supplier_approve_requires_approval_remarks():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=False)
+
+    resp = client.post(
+        f"/api/v1/purchase/supplier/{supplier['id']}/approve",
+        json={
+            "approved": True,
+            "approval_remarks": "   ",
+            "quality_acknowledged": True,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "Approval remarks are required" in resp.json()["detail"]
+
+
+def test_purchase_supplier_approval_metadata_stored_correctly():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=False)
+
+    approved = _approve_supplier(
+        token,
+        supplier["id"],
+        approval_remarks="Approved for aerospace quality flow",
+        quality_acknowledged=True,
+    )
+
+    assert approved["is_approved"] is True
+    assert approved["quality_acknowledged"] is True
+    assert approved["approval_remarks"] == "Approved for aerospace quality flow"
+    assert approved["approval_date"] is not None
+    assert approved["approved_by"] is not None
+
+
 def test_purchase_supplier_soft_delete():
     token = _get_admin_token()
     supplier = _create_supplier(token)
@@ -253,6 +317,7 @@ def test_purchase_po_duplicate_open_same_supplier_and_sales_order_blocked():
             "supplier_id": supplier["id"],
             "sales_order_id": None,
             "po_date": date.today().isoformat(),
+            "quality_notes": "Quality requirements accepted",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -264,6 +329,7 @@ def test_purchase_po_duplicate_open_same_supplier_and_sales_order_blocked():
             "supplier_id": supplier["id"],
             "sales_order_id": None,
             "po_date": date.today().isoformat(),
+            "quality_notes": "Quality requirements accepted",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -281,11 +347,30 @@ def test_purchase_po_date_validation_expected_delivery_before_po_date_rejected()
             "supplier_id": supplier["id"],
             "po_date": "2026-03-10",
             "expected_delivery_date": "2026-03-09",
+            "quality_notes": "Quality requirements accepted",
         },
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 400
     assert "Expected delivery date must be on or after PO date" in resp.json()["detail"]
+
+
+def test_purchase_po_creation_blocked_if_quality_notes_missing():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=False)
+    _approve_supplier(token, supplier["id"])
+
+    resp = client.post(
+        "/api/v1/purchase/order",
+        json={
+            "supplier_id": supplier["id"],
+            "po_date": date.today().isoformat(),
+            "quality_notes": "   ",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "Quality notes are required" in resp.json()["detail"]
 
 
 def test_purchase_po_list():

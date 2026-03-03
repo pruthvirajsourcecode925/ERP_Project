@@ -41,6 +41,8 @@ class SupplierCreate(BaseModel):
 
 class SupplierApprove(BaseModel):
     approved: bool = True
+    approval_remarks: str | None = None
+    quality_acknowledged: bool | None = None
 
 
 class SupplierUpdate(BaseModel):
@@ -61,6 +63,13 @@ class SupplierOut(BaseModel):
     email: str | None
     address: str | None
     is_approved: bool
+    approval_date: datetime | None
+    approved_by: int | None
+    approval_remarks: str | None
+    quality_acknowledged: bool
+    last_evaluation_date: datetime | None
+    evaluation_score: int | None
+    evaluation_remarks: str | None
     is_active: bool
     created_at: datetime
 
@@ -73,6 +82,7 @@ class PurchaseOrderCreate(BaseModel):
     po_date: date
     expected_delivery_date: date | None = None
     remarks: str | None = None
+    quality_notes: str | None = None
 
 
 class PurchaseOrderItemCreate(BaseModel):
@@ -106,6 +116,7 @@ class PurchaseOrderOut(BaseModel):
     status: PurchaseOrderStatus
     total_amount: Decimal
     remarks: str | None
+    quality_notes: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -169,6 +180,8 @@ def approve_supplier_endpoint(
             db,
             supplier_id=supplier_id,
             approved=payload.approved,
+            approval_remarks=payload.approval_remarks,
+            quality_acknowledged=payload.quality_acknowledged,
             updated_by=current_user.id,
         )
     except PurchaseBusinessRuleError as exc:
@@ -180,7 +193,12 @@ def approve_supplier_endpoint(
         action="SUPPLIER_APPROVAL_UPDATED",
         table_name="suppliers",
         record_id=supplier.id,
-        new_value={"is_approved": supplier.is_approved},
+        new_value={
+            "is_approved": supplier.is_approved,
+            "approval_date": supplier.approval_date.isoformat() if supplier.approval_date else None,
+            "approved_by": supplier.approved_by,
+            "quality_acknowledged": supplier.quality_acknowledged,
+        },
     )
 
     return supplier
@@ -295,6 +313,7 @@ def create_purchase_order_endpoint(
             po_date=payload.po_date,
             expected_delivery_date=payload.expected_delivery_date,
             remarks=payload.remarks,
+            quality_notes=payload.quality_notes,
             created_by=current_user.id,
         )
     except PurchaseBusinessRuleError as exc:
@@ -453,6 +472,7 @@ def get_purchase_order(
         status=po.status,
         total_amount=po.total_amount,
         remarks=po.remarks,
+        quality_notes=po.quality_notes,
         created_at=po.created_at,
         items=[PurchaseOrderItemOut.model_validate(item) for item in items],
     )

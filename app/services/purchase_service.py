@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -110,10 +110,28 @@ def approve_supplier(
     *,
     supplier_id: int,
     approved: bool = True,
+    approval_remarks: str | None = None,
+    quality_acknowledged: bool | None = None,
     updated_by: int | None = None,
 ) -> Supplier:
     supplier = _get_supplier(db, supplier_id)
-    supplier.is_approved = approved
+
+    if approved:
+        if quality_acknowledged is not True:
+            raise PurchaseBusinessRuleError("Quality acknowledgment must be True to approve supplier")
+        if not approval_remarks or not approval_remarks.strip():
+            raise PurchaseBusinessRuleError("Approval remarks are required when approving supplier")
+
+        supplier.is_approved = True
+        supplier.quality_acknowledged = True
+        supplier.approval_remarks = approval_remarks.strip()
+        supplier.approval_date = datetime.now(timezone.utc)
+        supplier.approved_by = updated_by
+    else:
+        supplier.is_approved = False
+        supplier.approval_date = None
+        supplier.approved_by = None
+
     supplier.updated_by = updated_by
     db.add(supplier)
     db.commit()
@@ -129,11 +147,14 @@ def create_purchase_order(
     po_date: date,
     expected_delivery_date: date | None = None,
     remarks: str | None = None,
+    quality_notes: str | None = None,
     created_by: int | None = None,
 ) -> PurchaseOrder:
     supplier = _get_supplier(db, supplier_id)
     if supplier.is_approved is not True:
         raise PurchaseBusinessRuleError("Cannot create PurchaseOrder for non-approved supplier")
+    if supplier.is_approved is True and (not quality_notes or not quality_notes.strip()):
+        raise PurchaseBusinessRuleError("Quality notes are required for approved supplier PurchaseOrder")
 
     _validate_po_dates(po_date=po_date, expected_delivery_date=expected_delivery_date)
 
@@ -162,6 +183,7 @@ def create_purchase_order(
         status=PurchaseOrderStatus.DRAFT,
         total_amount=Decimal("0.00"),
         remarks=remarks,
+        quality_notes=quality_notes.strip() if quality_notes else None,
         created_by=created_by,
         updated_by=created_by,
     )

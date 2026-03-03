@@ -51,6 +51,13 @@ class Supplier(Base, PurchaseAuditMixin):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    approval_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    approval_remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_acknowledged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_evaluation_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evaluation_score: Mapped[int | None] = mapped_column(nullable=True)
+    evaluation_remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     purchase_orders: Mapped[list[PurchaseOrder]] = relationship(back_populates="supplier")
@@ -73,6 +80,7 @@ class PurchaseOrder(Base, PurchaseAuditMixin):
     )
     total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"), nullable=False)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint("total_amount >= 0", name="ck_purchase_orders_total_amount_gte_zero"),
