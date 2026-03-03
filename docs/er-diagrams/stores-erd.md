@@ -73,7 +73,7 @@ erDiagram
 
     rmir_reports {
         bigint id PK
-        bigint grn_item_id FK UK
+        bigint grn_item_id FK "unique"
         date inspection_date
         int inspected_by FK
         enum inspection_status "Pending|Accepted|Rejected"
@@ -87,7 +87,7 @@ erDiagram
 
     mtc_verifications {
         bigint id PK
-        bigint grn_item_id FK UK
+        bigint grn_item_id FK "unique"
         varchar mtc_number
         bool chemical_composition_verified
         bool mechanical_properties_verified
@@ -103,7 +103,7 @@ erDiagram
 
     batch_inventories {
         bigint id PK
-        varchar batch_number FK UK
+        varchar batch_number FK "unique"
         bigint storage_location_id FK
         varchar item_code
         numeric current_quantity
