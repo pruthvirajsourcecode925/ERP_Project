@@ -120,7 +120,11 @@ Environment variables:
 
 ## Documentation
 
-- Sales ER Diagram: [docs/sales-erd.md](docs/sales-erd.md)
+- ER Diagram Index: [docs/er-diagrams/index.md](docs/er-diagrams/index.md)
+- Sales ER Diagram: [docs/er-diagrams/sales-erd.md](docs/er-diagrams/sales-erd.md)
+- Purchase ER Diagram: [docs/er-diagrams/purchase-erd.md](docs/er-diagrams/purchase-erd.md)
+- Engineering ER Diagram: [docs/er-diagrams/engineering-erd.md](docs/er-diagrams/engineering-erd.md)
+- Auth & RBAC ER Diagram: [docs/er-diagrams/auth-rbac-erd.md](docs/er-diagrams/auth-rbac-erd.md)
 
 ## Engineering Module
 
