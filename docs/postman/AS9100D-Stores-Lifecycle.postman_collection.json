@@ -1,0 +1,172 @@
+{
+  "info": {
+    "name": "AS9100D Stores Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Stores flow with location traceability: create location, GRN, GRN item, MTC, RMIR accept, issue."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "purchase_order_id", "value": "1" },
+    { "key": "supplier_id", "value": "1" },
+    { "key": "storage_location_id", "value": "" },
+    { "key": "grn_id", "value": "" },
+    { "key": "grn_item_id", "value": "" },
+    { "key": "batch_number", "value": "DRW-1001 / SO-25-001 / CUST-A / HEAT-77" }
+  ],
+  "item": [
+    {
+      "name": "Create Location",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('storage_location_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"location_code\": \"LOC-001\",\n  \"location_name\": \"Main Stores Rack\",\n  \"description\": \"Primary receiving location\",\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/location",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "location"]
+        }
+      }
+    },
+    {
+      "name": "Create GRN (mandatory location)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('grn_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"grn_number\": \"GRN-001\",\n  \"purchase_order_id\": {{purchase_order_id}},\n  \"supplier_id\": {{supplier_id}},\n  \"storage_location_id\": {{storage_location_id}},\n  \"grn_date\": \"2026-03-04\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/grn",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "grn"]
+        }
+      }
+    },
+    {
+      "name": "Add GRN Item (traceable batch)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('grn_item_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"item_code\": \"RM-AL-001\",\n  \"description\": \"Raw material\",\n  \"heat_number\": \"HT-77\",\n  \"batch_number\": \"{{batch_number}}\",\n  \"received_quantity\": \"10.000\",\n  \"accepted_quantity\": \"8.000\",\n  \"rejected_quantity\": \"2.000\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/grn/{{grn_id}}/item",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "grn", "{{grn_id}}", "item"]
+        }
+      }
+    },
+    {
+      "name": "Create MTC",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mtc_number\": \"MTC-001\",\n  \"chemical_composition_verified\": true,\n  \"mechanical_properties_verified\": true,\n  \"standard_compliance_verified\": true,\n  \"verification_date\": \"2026-03-04\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/grn/{{grn_item_id}}/mtc",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "grn", "{{grn_item_id}}", "mtc"]
+        }
+      }
+    },
+    {
+      "name": "Accept RMIR (mandatory location)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"inspection_date\": \"2026-03-04\",\n  \"inspection_status\": \"Accepted\",\n  \"remarks\": \"Accepted\",\n  \"storage_location_id\": {{storage_location_id}}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/grn/{{grn_item_id}}/inspect",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "grn", "{{grn_item_id}}", "inspect"]
+        }
+      }
+    },
+    {
+      "name": "Issue Material",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_number\": \"{{batch_number}}\",\n  \"storage_location_id\": {{storage_location_id}},\n  \"issue_quantity\": \"1.000\",\n  \"reference_number\": \"ISS-001\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stores/issue",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "stores", "issue"]
+        }
+      }
+    }
+  ]
+}

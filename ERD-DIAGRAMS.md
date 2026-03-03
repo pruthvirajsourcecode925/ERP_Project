@@ -10,3 +10,7 @@ Primary ER diagrams are maintained in this backend repository:
 - Auth & RBAC ERD: [docs/er-diagrams/auth-rbac-erd.md](docs/er-diagrams/auth-rbac-erd.md)
 
 Rule: whenever schema changes are made in any module, update the corresponding ERD file before push.
+
+## Stores Operations
+- Stores SOP: [docs/stores-operations-sop.md](docs/stores-operations-sop.md)
+- Stores Postman collection: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
