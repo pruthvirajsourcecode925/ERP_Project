@@ -148,3 +148,87 @@ def test_cannot_deactivate_admin_role():
     )
     assert response.status_code == 400
     assert "Cannot deactivate Admin" in response.json()["detail"]
+
+
+def test_admin_can_assign_multiple_modules_to_role():
+    token = get_admin_token()
+
+    create_resp = client.post(
+        "/api/v1/roles/",
+        json={"name": f"ModuleRole{random.randint(1000, 9999)}"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_resp.status_code == 201
+    role_id = create_resp.json()["id"]
+
+    update_resp = client.put(
+        f"/api/v1/roles/{role_id}/modules",
+        json={"modules": ["sales", "purchase", "engineering"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert update_resp.status_code == 200
+    modules = update_resp.json()["modules"]
+    assert modules == ["engineering", "purchase", "sales"]
+
+    get_resp = client.get(
+        f"/api/v1/roles/{role_id}/modules",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert get_resp.status_code == 200
+    assert get_resp.json()["modules"] == ["engineering", "purchase", "sales"]
+
+
+def test_module_access_enforced_for_custom_role():
+    admin_token = get_admin_token()
+    role_name = f"CustomSales{random.randint(1000, 9999)}"
+
+    create_role_resp = client.post(
+        "/api/v1/roles/",
+        json={"name": role_name},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_role_resp.status_code == 201
+    role_id = create_role_resp.json()["id"]
+
+    db = SessionLocal()
+    try:
+        custom_role = db.scalar(select(Role).where(Role.id == role_id))
+        assert custom_role is not None
+        uid = random.randint(10000, 99999)
+        username = f"{role_name.lower()}{uid}"
+        user = User(
+            username=username,
+            email=f"{username}@example.com",
+            password_hash=get_password_hash("Password@123"),
+            role_id=custom_role.id,
+            auth_provider="local",
+            is_active=True,
+            is_locked=False,
+            failed_attempts=0,
+            is_deleted=False,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        custom_token = create_access_token(str(user.id))
+    finally:
+        db.close()
+
+    denied_resp = client.get(
+        "/api/v1/sales/quotation-terms",
+        headers={"Authorization": f"Bearer {custom_token}"},
+    )
+    assert denied_resp.status_code == 403
+
+    assign_resp = client.put(
+        f"/api/v1/roles/{role_id}/modules",
+        json={"modules": ["sales", "purchase"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert assign_resp.status_code == 200
+
+    allowed_resp = client.get(
+        "/api/v1/sales/quotation-terms",
+        headers={"Authorization": f"Bearer {custom_token}"},
+    )
+    assert allowed_resp.status_code == 200

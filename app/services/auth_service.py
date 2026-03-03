@@ -2,8 +2,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.core.security import verify_password, get_password_hash
+from app.core.rbac import DEFAULT_ROLE_MODULES, normalize_module_key
 from app.models.user import User
-from app.models.role import Role
+from app.models.role import Role, RoleModuleAccess
 from app.models.audit_log import AuditLog
 from app.core.config import settings
 
@@ -139,3 +140,17 @@ def bootstrap_roles_and_admin(db: Session) -> None:
         admin_user.is_deleted = False
         db.add(admin_user)
         db.commit()
+
+    existing_access = {
+        (row.role_id, row.module_key)
+        for row in db.scalars(select(RoleModuleAccess)).all()
+    }
+    for role in db.scalars(select(Role)).all():
+        modules = DEFAULT_ROLE_MODULES.get(role.name, [])
+        for module_key in modules:
+            normalized = normalize_module_key(module_key)
+            key = (role.id, normalized)
+            if key in existing_access:
+                continue
+            db.add(RoleModuleAccess(role_id=role.id, module_key=normalized))
+    db.commit()

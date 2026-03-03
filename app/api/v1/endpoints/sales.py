@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
@@ -50,6 +51,15 @@ DEFAULT_QUOTATION_TERMS = [
     "Any deviation requires written customer approval.",
     "Lead time starts after PO acceptance and technical closure.",
 ]
+
+
+def _ensure_pdf_path_in_exports(file_path: str, subfolder: str) -> str:
+    project_root = Path(__file__).resolve().parents[4]
+    allowed_dir = (project_root / "exports" / subfolder).resolve()
+    resolved_file = Path(file_path).resolve()
+    if allowed_dir not in resolved_file.parents:
+        raise HTTPException(status_code=500, detail="Generated PDF path is outside allowed export folder")
+    return str(resolved_file)
 
 
 def _get_latest_terms_setting(db: Session) -> QuotationTermsSetting | None:
@@ -342,7 +352,7 @@ def create_contract_review(
     review = ContractReview(
         document_number=_generate_document_number(db, "CR", ContractReview),
         revision=0,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(timezone.utc),
         generated_by=current_user.id,
         enquiry_id=payload.enquiry_id,
         status=payload.status,
@@ -353,7 +363,7 @@ def create_contract_review(
         quality_requirements_ok=payload.quality_requirements_ok,
         review_comments=payload.review_comments,
         reviewed_by=current_user.id,
-        reviewed_at=datetime.utcnow(),
+        reviewed_at=datetime.now(timezone.utc),
         created_by=current_user.id,
         updated_by=current_user.id,
     )
@@ -501,8 +511,10 @@ def download_quotation_pdf(
         new_value={"file_path": pdf_result["file_path"]},
     )
 
+    safe_file_path = _ensure_pdf_path_in_exports(pdf_result["file_path"], "quotations")
+
     return FileResponse(
-        path=pdf_result["file_path"],
+        path=safe_file_path,
         media_type="application/pdf",
         filename=f"quotation_{quotation.quotation_number}.pdf",
     )
@@ -531,7 +543,7 @@ def create_customer_po_review(
     po_review = CustomerPOReview(
         document_number=_generate_document_number(db, "POA", CustomerPOReview),
         revision=0,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(timezone.utc),
         generated_by=current_user.id,
         quotation_id=payload.quotation_id,
         customer_po_number=payload.customer_po_number,
@@ -540,7 +552,7 @@ def create_customer_po_review(
         status=payload.status,
         deviation_notes=payload.deviation_notes,
         reviewed_by=current_user.id,
-        reviewed_at=datetime.utcnow(),
+        reviewed_at=datetime.now(timezone.utc),
         created_by=current_user.id,
         updated_by=current_user.id,
     )
@@ -691,8 +703,10 @@ def download_customer_po_review_pdf(
         new_value={"file_path": pdf_result["file_path"]},
     )
 
+    safe_file_path = _ensure_pdf_path_in_exports(pdf_result["file_path"], "po_reviews")
+
     return FileResponse(
-        path=pdf_result["file_path"],
+        path=safe_file_path,
         media_type="application/pdf",
         filename=f"po_review_{po_review.customer_po_number}.pdf",
     )

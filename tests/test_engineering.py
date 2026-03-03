@@ -1,8 +1,9 @@
 import random
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -11,6 +12,7 @@ from app.core.security import create_access_token, get_password_hash
 from app.db.session import SessionLocal
 from app.models.role import Role
 from app.models.user import User
+from app.modules.engineering.models import RouteCard
 from app.modules.sales.models import (
     ContractReview,
     ContractReviewStatus,
@@ -23,6 +25,10 @@ from app.modules.sales.models import (
     QuotationStatus,
     SalesOrder,
     SalesOrderStatus,
+)
+from app.services.engineering_service import (
+    EngineeringBusinessRuleError,
+    validate_route_card_for_production,
 )
 
 client = TestClient(app)
@@ -78,7 +84,7 @@ def _seed_sales_order() -> int:
         contract_review = ContractReview(
             document_number=f"CR-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             enquiry_id=enquiry.id,
             status=ContractReviewStatus.APPROVED,
             scope_clarity_ok=True,
@@ -93,7 +99,7 @@ def _seed_sales_order() -> int:
         quotation = Quotation(
             document_number=f"QT-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             quotation_number=f"QTN{code}",
             enquiry_id=enquiry.id,
             contract_review_id=contract_review.id,
@@ -112,7 +118,7 @@ def _seed_sales_order() -> int:
         po_review = CustomerPOReview(
             document_number=f"POA-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             quotation_id=quotation.id,
             customer_po_number=f"PO{code}",
             customer_po_date=date.today(),
@@ -369,3 +375,146 @@ def test_engineering_soft_delete_and_list_filters_pagination():
     assert list_after.status_code == 200
     ids = [x["id"] for x in list_after.json()]
     assert route_card_id not in ids
+
+
+def test_engineering_route_card_rejects_non_current_revision():
+    token = _get_admin_token()
+    sales_order_id = _seed_sales_order()
+    suffix = random.randint(100000, 999999)
+
+    draw = client.post(
+        "/api/v1/engineering/drawing",
+        json={"drawing_number": f"DRW-NC-{suffix}", "part_name": "NC Part", "is_active": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert draw.status_code == 201
+    drawing_id = draw.json()["id"]
+
+    rev_a = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "A", "file_path": "/tmp/nc-a.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev_a.status_code == 201
+    rev_a_id = rev_a.json()["id"]
+
+    rev_b = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "B", "file_path": "/tmp/nc-b.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev_b.status_code == 201
+
+    route = client.post(
+        "/api/v1/engineering/route-card",
+        json={
+            "route_number": f"RC-NC-{suffix}",
+            "drawing_revision_id": rev_a_id,
+            "sales_order_id": sales_order_id,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert route.status_code == 400
+
+
+def test_engineering_validate_route_card_for_production_rejects_draft():
+    token = _get_admin_token()
+    sales_order_id = _seed_sales_order()
+    suffix = random.randint(100000, 999999)
+
+    draw = client.post(
+        "/api/v1/engineering/drawing",
+        json={"drawing_number": f"DRW-VP-{suffix}", "part_name": "VP Part", "is_active": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert draw.status_code == 201
+    drawing_id = draw.json()["id"]
+
+    rev = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "A", "file_path": "/tmp/vp-a.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev.status_code == 201
+    revision_id = rev.json()["id"]
+
+    route = client.post(
+        "/api/v1/engineering/route-card",
+        json={
+            "route_number": f"RC-VP-{suffix}",
+            "drawing_revision_id": revision_id,
+            "sales_order_id": sales_order_id,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert route.status_code == 201
+    route_card_id = route.json()["id"]
+
+    db = SessionLocal()
+    try:
+        route_card = db.scalar(select(RouteCard).where(RouteCard.id == route_card_id))
+        assert route_card is not None
+        with pytest.raises(EngineeringBusinessRuleError):
+            validate_route_card_for_production(route_card)
+    finally:
+        db.close()
+
+
+def test_engineering_validate_route_card_for_production_accepts_released():
+    token = _get_admin_token()
+    sales_order_id = _seed_sales_order()
+    suffix = random.randint(100000, 999999)
+
+    draw = client.post(
+        "/api/v1/engineering/drawing",
+        json={"drawing_number": f"DRW-VR-{suffix}", "part_name": "VR Part", "is_active": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert draw.status_code == 201
+    drawing_id = draw.json()["id"]
+
+    rev = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "A", "file_path": "/tmp/vr-a.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev.status_code == 201
+    revision_id = rev.json()["id"]
+
+    route = client.post(
+        "/api/v1/engineering/route-card",
+        json={
+            "route_number": f"RC-VR-{suffix}",
+            "drawing_revision_id": revision_id,
+            "sales_order_id": sales_order_id,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert route.status_code == 201
+    route_card_id = route.json()["id"]
+
+    op = client.post(
+        f"/api/v1/engineering/route-card/{route_card_id}/operation",
+        json={
+            "operation_number": 10,
+            "operation_name": "Cutting",
+            "work_center": "WC-1",
+            "sequence_order": 1,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert op.status_code == 201
+
+    release_ok = client.post(
+        f"/api/v1/engineering/route-card/{route_card_id}/release",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert release_ok.status_code == 200
+
+    db = SessionLocal()
+    try:
+        route_card = db.scalar(select(RouteCard).where(RouteCard.id == route_card_id))
+        assert route_card is not None
+        validate_route_card_for_production(route_card)
+    finally:
+        db.close()

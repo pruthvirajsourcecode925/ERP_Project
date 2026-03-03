@@ -135,7 +135,7 @@ def list_users(
             raise HTTPException(status_code=400, detail="Invalid auth_provider. Use one of: local, google, both")
         stmt = stmt.where(User.auth_provider == auth_provider)
 
-    users = db.scalars(stmt.offset(skip).limit(limit)).all()
+    users = db.scalars(stmt.order_by(User.id.desc()).offset(skip).limit(limit)).all()
     return users
 
 

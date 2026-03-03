@@ -63,7 +63,7 @@ def _project_root() -> Path:
 
 
 def generate_quotation_pdf(data: QuotationPDFData) -> dict[str, str]:
-    exports_dir = _project_root() / "exports"
+    exports_dir = _project_root() / "exports" / "quotations"
     exports_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = exports_dir / f"quotation_{data.quotation_number}.pdf"

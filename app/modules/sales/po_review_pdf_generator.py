@@ -40,7 +40,7 @@ def _status_text(value: bool) -> str:
 
 
 def generate_customer_po_review_pdf(data: CustomerPOReviewPDFData) -> dict[str, str]:
-    exports_dir = _project_root() / "exports"
+    exports_dir = _project_root() / "exports" / "po_reviews"
     exports_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = exports_dir / f"po_review_{data.po_review_number}.pdf"

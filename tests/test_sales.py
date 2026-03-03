@@ -1,5 +1,5 @@
 import random
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -99,7 +99,7 @@ def _seed_sales_records(
         contract_review = ContractReview(
             document_number=f"CR-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             generated_by=None,
             enquiry_id=enquiry.id,
             status=contract_status,
@@ -115,7 +115,7 @@ def _seed_sales_records(
         quotation = Quotation(
             document_number=f"QT-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             generated_by=None,
             quotation_number=f"QTN{code}",
             enquiry_id=enquiry.id,
@@ -135,7 +135,7 @@ def _seed_sales_records(
         po_review = CustomerPOReview(
             document_number=f"POA-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             generated_by=None,
             quotation_id=quotation.id,
             customer_po_number=f"PO{code}",
@@ -183,7 +183,7 @@ def _seed_sales_upto_quotation(
         contract_review = ContractReview(
             document_number=f"CR-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             generated_by=None,
             enquiry_id=enquiry.id,
             status=contract_status,
@@ -199,7 +199,7 @@ def _seed_sales_upto_quotation(
         quotation = Quotation(
             document_number=f"QT-{date.today().year}-{code:04d}",
             revision=0,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(timezone.utc),
             generated_by=None,
             quotation_number=f"QTN{code}",
             enquiry_id=enquiry.id,

@@ -23,3 +23,13 @@ class RoleOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class RoleModuleAccessUpdate(BaseModel):
+    modules: list[str]
+
+
+class RoleModuleAccessOut(BaseModel):
+    role_id: int
+    role_name: str
+    modules: list[str]

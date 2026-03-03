@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.rbac import normalize_module_key
 from app.db.session import SessionLocal
 from app.models.user import User
-from app.models.role import Role
+from app.models.role import Role, RoleModuleAccess
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -74,7 +75,13 @@ def get_optional_current_user(
     return user
 
 
-def require_roles(*allowed_roles: str):
+def require_roles(*allowed_roles: str, module: str | None = None):
+    inferred_module = module
+    if inferred_module is None:
+        non_admin_roles = [role_name for role_name in allowed_roles if role_name != "Admin"]
+        if non_admin_roles:
+            inferred_module = normalize_module_key(non_admin_roles[0])
+
     def checker(
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db),
@@ -86,7 +93,22 @@ def require_roles(*allowed_roles: str):
         if role.name == "Admin":
             return current_user
 
-        if role.name not in allowed_roles:
+        role_allowed_by_name = role.name in allowed_roles
+        module_permissions = {
+            access.module_key
+            for access in db.scalars(select(RoleModuleAccess).where(RoleModuleAccess.role_id == role.id)).all()
+        }
+
+        if module_permissions:
+            module_key = normalize_module_key(inferred_module) if inferred_module else None
+            if module_key and module_key in module_permissions:
+                return current_user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{role.name}' does not have module access",
+            )
+
+        if not role_allowed_by_name:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user
 

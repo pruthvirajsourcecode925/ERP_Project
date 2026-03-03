@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.rbac import VALID_MODULE_KEYS, normalize_module_key
 from app.api.deps import get_current_active_admin, get_db
-from app.models.role import Role
-from app.schemas.role import RoleCreate, RoleUpdate, RoleOut
+from app.models.role import Role, RoleModuleAccess
+from app.schemas.role import RoleCreate, RoleUpdate, RoleOut, RoleModuleAccessOut, RoleModuleAccessUpdate
 from app.services.auth_service import add_audit_log
 
 router = APIRouter(tags=["Roles"])
@@ -133,3 +134,60 @@ def deactivate_role(
         new_value={"is_active": False},
     )
     return None
+
+
+@router.get("/{role_id}/modules", response_model=RoleModuleAccessOut)
+def get_role_modules(
+    role_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_admin),
+):
+    role = db.scalar(select(Role).where(Role.id == role_id))
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    modules = [
+        row.module_key
+        for row in db.scalars(
+            select(RoleModuleAccess)
+            .where(RoleModuleAccess.role_id == role_id)
+            .order_by(RoleModuleAccess.module_key.asc())
+        ).all()
+    ]
+    return RoleModuleAccessOut(role_id=role.id, role_name=role.name, modules=modules)
+
+
+@router.put("/{role_id}/modules", response_model=RoleModuleAccessOut)
+def update_role_modules(
+    role_id: int,
+    payload: RoleModuleAccessUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_active_admin),
+):
+    role = db.scalar(select(Role).where(Role.id == role_id))
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    normalized_modules = sorted({normalize_module_key(module) for module in payload.modules if module.strip()})
+    invalid_modules = [module for module in normalized_modules if module not in VALID_MODULE_KEYS]
+    if invalid_modules:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid module(s): {', '.join(invalid_modules)}",
+        )
+
+    db.query(RoleModuleAccess).filter(RoleModuleAccess.role_id == role_id).delete(synchronize_session=False)
+    for module_key in normalized_modules:
+        db.add(RoleModuleAccess(role_id=role_id, module_key=module_key))
+    db.commit()
+
+    add_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="ROLE_MODULE_ACCESS_UPDATED",
+        table_name="role_module_access",
+        record_id=role.id,
+        new_value={"modules": normalized_modules},
+    )
+
+    return RoleModuleAccessOut(role_id=role.id, role_name=role.name, modules=normalized_modules)
