@@ -72,6 +72,8 @@ class GRN(Base, StoresAuditMixin):
     grn_number: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     purchase_order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"), nullable=False, index=True)
     supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"), nullable=False, index=True)
+    received_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    received_datetime: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
     grn_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[GRNStatus] = mapped_column(
         Enum(

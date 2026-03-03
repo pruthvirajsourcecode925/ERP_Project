@@ -36,6 +36,7 @@ class GRNCreate(BaseModel):
     grn_number: str
     purchase_order_id: int
     supplier_id: int
+    storage_location_id: int
     grn_date: date
 
 
@@ -44,6 +45,8 @@ class GRNOut(BaseModel):
     grn_number: str
     purchase_order_id: int
     supplier_id: int
+    received_by: int
+    received_datetime: datetime
     grn_date: date
     status: GRNStatus
     created_at: datetime
@@ -145,6 +148,7 @@ def create_grn_endpoint(
             grn_number=payload.grn_number,
             purchase_order_id=payload.purchase_order_id,
             supplier_id=payload.supplier_id,
+            storage_location_id=payload.storage_location_id,
             grn_date=payload.grn_date,
             created_by=current_user.id,
         )

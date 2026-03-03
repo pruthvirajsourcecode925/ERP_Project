@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -25,6 +25,11 @@ def _unique_code(prefix: str = "X") -> str:
     return f"{prefix}-{uuid4().hex[:10].upper()}"
 
 
+def _traceable_batch_number() -> str:
+    token = uuid4().hex.upper()
+    return f"DRW-{token[:4]} / SO-{token[4:6]}-{token[6:9]} / CUST-{token[9:12]} / HEAT-{token[12:14]}"
+
+
 def _get_admin_token() -> str:
     db = SessionLocal()
     admin_id = None
@@ -46,6 +51,16 @@ def _get_admin_token() -> str:
 
     assert admin_id is not None
     return create_access_token(str(admin_id))
+
+
+def _get_admin_user_id() -> int:
+    db = SessionLocal()
+    try:
+        admin = db.scalar(select(User).where(User.username == "admin"))
+        assert admin is not None
+        return admin.id
+    finally:
+        db.close()
 
 
 def _create_supplier(token: str) -> dict:
@@ -121,7 +136,16 @@ def _create_issued_po(token: str) -> tuple[dict, dict]:
     return supplier, po
 
 
-def _create_grn(token: str, po_id: int, supplier_id: int) -> dict:
+def _create_grn(token: str, po_id: int, supplier_id: int, storage_location_id: int | None = None) -> dict:
+    if storage_location_id is None:
+        location = _create_location(
+            token,
+            location_code=_unique_code("LOC"),
+            location_name="Auto GRN Location",
+            is_active=True,
+        )
+        storage_location_id = location["id"]
+
     grn_number = _unique_code("GRN")
     resp = client.post(
         "/api/v1/stores/grn",
@@ -129,6 +153,7 @@ def _create_grn(token: str, po_id: int, supplier_id: int) -> dict:
             "grn_number": grn_number,
             "purchase_order_id": po_id,
             "supplier_id": supplier_id,
+            "storage_location_id": storage_location_id,
             "grn_date": date.today().isoformat(),
         },
         headers={"Authorization": f"Bearer {token}"},
@@ -223,6 +248,12 @@ def test_stores_grn_creation_blocked_if_po_not_issued():
     supplier = _create_supplier(token)
     _approve_supplier(token, supplier["id"])
     po = _create_po(token, supplier["id"])
+    location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Receiving Location",
+        is_active=True,
+    )
 
     resp = client.post(
         "/api/v1/stores/grn",
@@ -230,6 +261,7 @@ def test_stores_grn_creation_blocked_if_po_not_issued():
             "grn_number": _unique_code("GRN"),
             "purchase_order_id": po["id"],
             "supplier_id": supplier["id"],
+            "storage_location_id": location["id"],
             "grn_date": date.today().isoformat(),
         },
         headers={"Authorization": f"Bearer {token}"},
@@ -249,7 +281,7 @@ def test_stores_grn_item_validation_accepted_plus_rejected_equals_received():
             "item_code": "RM-AL-001",
             "description": "Raw material",
             "heat_number": "HT-002",
-            "batch_number": _unique_code("BATCH"),
+            "batch_number": _traceable_batch_number(),
             "received_quantity": "10.000",
             "accepted_quantity": "7.000",
             "rejected_quantity": "2.000",
@@ -264,7 +296,7 @@ def test_stores_mtc_required_before_rmir_acceptance():
     token = _get_admin_token()
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    item = _add_grn_item(token, grn["id"], batch_number=_unique_code("BATCH"))
+    item = _add_grn_item(token, grn["id"], batch_number=_traceable_batch_number())
 
     resp = client.post(
         f"/api/v1/stores/grn/{item['id']}/inspect",
@@ -283,7 +315,13 @@ def test_stores_stock_increases_only_after_rmir_accepted_and_batch_inventory_upd
     token = _get_admin_token()
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    batch_number = _unique_code("BATCH")
+    location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Inspection Location",
+        is_active=True,
+    )
+    batch_number = _traceable_batch_number()
     item = _add_grn_item(token, grn["id"], batch_number=batch_number, accepted="6.000", rejected="4.000")
 
     pending_resp = client.post(
@@ -325,6 +363,7 @@ def test_stores_stock_increases_only_after_rmir_accepted_and_batch_inventory_upd
             "inspection_date": date.today().isoformat(),
             "inspection_status": "Accepted",
             "remarks": "Accepted",
+            "storage_location_id": location["id"],
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -343,10 +382,15 @@ def test_stores_stock_increases_only_after_rmir_accepted_and_batch_inventory_upd
 
 def test_stores_issue_blocked_if_insufficient_stock():
     token = _get_admin_token()
-    default_location = _ensure_default_location(token)
+    default_location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Issue Location",
+        is_active=True,
+    )
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    batch_number = _unique_code("BATCH")
+    batch_number = _traceable_batch_number()
     item = _add_grn_item(token, grn["id"], batch_number=batch_number, accepted="3.000", rejected="7.000")
 
     mtc_resp = client.post(
@@ -368,6 +412,7 @@ def test_stores_issue_blocked_if_insufficient_stock():
             "inspection_date": date.today().isoformat(),
             "inspection_status": "Accepted",
             "remarks": "Accepted",
+            "storage_location_id": default_location["id"],
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -389,10 +434,15 @@ def test_stores_issue_blocked_if_insufficient_stock():
 
 def test_stores_ledger_entries_created_for_grn_and_issue_and_inventory_updated_correctly():
     token = _get_admin_token()
-    default_location = _ensure_default_location(token)
+    default_location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Ledger Location",
+        is_active=True,
+    )
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    batch_number = _unique_code("BATCH")
+    batch_number = _traceable_batch_number()
     item = _add_grn_item(token, grn["id"], batch_number=batch_number, accepted="9.000", rejected="1.000")
 
     mtc_resp = client.post(
@@ -414,6 +464,7 @@ def test_stores_ledger_entries_created_for_grn_and_issue_and_inventory_updated_c
             "inspection_date": date.today().isoformat(),
             "inspection_status": "Accepted",
             "remarks": "Accepted",
+            "storage_location_id": default_location["id"],
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -480,7 +531,7 @@ def test_stores_cannot_use_inactive_location_for_grn_acceptance():
     )
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    item = _add_grn_item(token, grn["id"], batch_number=_unique_code("BATCH"))
+    item = _add_grn_item(token, grn["id"], batch_number=_traceable_batch_number())
 
     mtc_resp = client.post(
         f"/api/v1/stores/grn/{item['id']}/mtc",
@@ -509,12 +560,11 @@ def test_stores_cannot_use_inactive_location_for_grn_acceptance():
     assert "inactive" in inspect_resp.json()["detail"].lower()
 
 
-def test_stores_default_location_auto_assigned_if_not_provided():
+def test_stores_rmir_acceptance_blocked_if_location_not_provided():
     token = _get_admin_token()
-    default_location = _ensure_default_location(token)
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    batch_number = _unique_code("BATCH")
+    batch_number = _traceable_batch_number()
     item = _add_grn_item(token, grn["id"], batch_number=batch_number, accepted="7.000", rejected="3.000")
 
     mtc_resp = client.post(
@@ -539,17 +589,8 @@ def test_stores_default_location_auto_assigned_if_not_provided():
         },
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert inspect_resp.status_code == 200
-
-    db = SessionLocal()
-    try:
-        inventory = db.scalar(
-            select(BatchInventory).where(BatchInventory.batch_number == batch_number, BatchInventory.is_deleted.is_(False))
-        )
-        assert inventory is not None
-        assert inventory.storage_location_id == default_location["id"]
-    finally:
-        db.close()
+    assert inspect_resp.status_code == 400
+    assert "storage_location_id is required" in inspect_resp.json()["detail"]
 
 
 def test_stores_cannot_issue_material_from_inactive_location():
@@ -562,7 +603,7 @@ def test_stores_cannot_issue_material_from_inactive_location():
     )
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    batch_number = _unique_code("BATCH")
+    batch_number = _traceable_batch_number()
     item = _add_grn_item(token, grn["id"], batch_number=batch_number, accepted="4.000", rejected="6.000")
 
     mtc_resp = client.post(
@@ -621,7 +662,7 @@ def test_stores_cannot_delete_location_if_stock_exists():
     )
     supplier, po = _create_issued_po(token)
     grn = _create_grn(token, po["id"], supplier["id"])
-    item = _add_grn_item(token, grn["id"], batch_number=_unique_code("BATCH"), accepted="2.000", rejected="8.000")
+    item = _add_grn_item(token, grn["id"], batch_number=_traceable_batch_number(), accepted="2.000", rejected="8.000")
 
     mtc_resp = client.post(
         f"/api/v1/stores/grn/{item['id']}/mtc",
@@ -674,3 +715,107 @@ def test_stores_can_delete_location_if_no_stock_exists():
     assert body["id"] == location["id"]
     assert body["is_active"] is False
     assert body["is_deleted"] is True
+
+
+def test_stores_grn_creation_blocked_if_storage_location_missing():
+    token = _get_admin_token()
+    supplier, po = _create_issued_po(token)
+
+    resp = client.post(
+        "/api/v1/stores/grn",
+        json={
+            "grn_number": _unique_code("GRN"),
+            "purchase_order_id": po["id"],
+            "supplier_id": supplier["id"],
+            "grn_date": date.today().isoformat(),
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 422
+
+
+def test_stores_grn_creation_blocked_if_location_inactive():
+    token = _get_admin_token()
+    supplier, po = _create_issued_po(token)
+    inactive_location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Inactive Receiving",
+        is_active=False,
+    )
+
+    resp = client.post(
+        "/api/v1/stores/grn",
+        json={
+            "grn_number": _unique_code("GRN"),
+            "purchase_order_id": po["id"],
+            "supplier_id": supplier["id"],
+            "storage_location_id": inactive_location["id"],
+            "grn_date": date.today().isoformat(),
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "inactive" in resp.json()["detail"].lower()
+
+
+def test_stores_grn_sets_received_traceability_fields():
+    token = _get_admin_token()
+    admin_user_id = _get_admin_user_id()
+    supplier, po = _create_issued_po(token)
+    location = _create_location(
+        token,
+        location_code=_unique_code("LOC"),
+        location_name="Traceability Receiving",
+        is_active=True,
+    )
+
+    grn = _create_grn(token, po["id"], supplier["id"], storage_location_id=location["id"])
+    assert grn["received_by"] == admin_user_id
+    assert grn["received_datetime"]
+    parsed_dt = datetime.fromisoformat(grn["received_datetime"].replace("Z", "+00:00"))
+    assert parsed_dt is not None
+
+
+def test_stores_invalid_batch_format_rejected():
+    token = _get_admin_token()
+    supplier, po = _create_issued_po(token)
+    grn = _create_grn(token, po["id"], supplier["id"])
+
+    resp = client.post(
+        f"/api/v1/stores/grn/{grn['id']}/item",
+        json={
+            "item_code": "RM-AL-001",
+            "description": "Raw material",
+            "heat_number": "HT-002",
+            "batch_number": "BATCH-INVALID",
+            "received_quantity": "10.000",
+            "accepted_quantity": "8.000",
+            "rejected_quantity": "2.000",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "Batch number must follow format" in resp.json()["detail"]
+
+
+def test_stores_valid_batch_format_accepted():
+    token = _get_admin_token()
+    supplier, po = _create_issued_po(token)
+    grn = _create_grn(token, po["id"], supplier["id"])
+    valid_batch = _traceable_batch_number()
+
+    resp = client.post(
+        f"/api/v1/stores/grn/{grn['id']}/item",
+        json={
+            "item_code": "RM-AL-001",
+            "description": "Raw material",
+            "heat_number": "HT-002",
+            "batch_number": valid_batch,
+            "received_quantity": "10.000",
+            "accepted_quantity": "8.000",
+            "rejected_quantity": "2.000",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 201, resp.text

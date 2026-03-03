@@ -1,4 +1,3 @@
-````markdown
 # Stores Module ER Diagram
 
 [← Back to ERD Index](index.md)
@@ -6,7 +5,7 @@
 ```mermaid
 erDiagram
     users ||--o{ storage_locations : created_by_updated_by
-    users ||--o{ grns : created_by_updated_by
+    users ||--o{ grns : created_by_updated_by_received_by
     users ||--o{ grn_items : created_by_updated_by
     users ||--o{ rmir_reports : inspected_by
     users ||--o{ mtc_verifications : verified_by
@@ -44,6 +43,8 @@ erDiagram
         varchar grn_number UK
         bigint purchase_order_id FK
         bigint supplier_id FK
+        int received_by FK
+        timestamptz received_datetime
         date grn_date
         enum status "Draft|UnderInspection|Accepted|Rejected"
         timestamptz created_at
@@ -132,14 +133,13 @@ erDiagram
 ```
 
 ## Notes
-- Location-aware inventory is enforced via `batch_inventories.storage_location_id` and `stock_ledger.storage_location_id`.
-- RMIR acceptance posts stock only after MTC verification and writes GRN ledger entry.
+- GRN creation requires `storage_location_id` (must exist and be active).
+- GRN stores receiving traceability via `received_by` and `received_datetime`.
+- RMIR acceptance requires explicit `storage_location_id`; no DEFAULT fallback.
+- Batch traceability format is enforced: `DRW-XXXX / SO-XX-XXX / CUST-XXX / HEAT-XX`.
 - Deleting a location is soft-delete only and blocked when positive stock exists at that location.
-- If location is omitted during RMIR acceptance, active `DEFAULT` location is auto-resolved.
 
 ## Navigation
 - Previous: [Purchase ERD](purchase-erd.md)
 - Next: [Auth & RBAC ERD](auth-rbac-erd.md)
 - Index: [ER Diagram Index](index.md)
-
-````

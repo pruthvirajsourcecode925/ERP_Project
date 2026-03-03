@@ -70,31 +70,38 @@ def _get_grn_item(db: Session, grn_item_id: int) -> GRNItem:
     return grn_item
 
 
-def _resolve_active_storage_location(db: Session, storage_location_id: int | None) -> StorageLocation:
-    if storage_location_id is not None:
-        location = db.scalar(
-            select(StorageLocation).where(
-                StorageLocation.id == storage_location_id,
-                StorageLocation.is_deleted.is_(False),
-            )
+def _get_active_storage_location(db: Session, storage_location_id: int) -> StorageLocation:
+    location = db.scalar(
+        select(StorageLocation).where(
+            StorageLocation.id == storage_location_id,
+            StorageLocation.is_deleted.is_(False),
         )
-        if not location:
-            raise StoresBusinessRuleError("Storage location not found")
-    else:
-        location = db.scalar(
-            select(StorageLocation).where(
-                StorageLocation.location_code == "DEFAULT",
-                StorageLocation.is_active.is_(True),
-                StorageLocation.is_deleted.is_(False),
-            )
-        )
-        if not location:
-            raise StoresBusinessRuleError("Default storage location 'DEFAULT' not found or inactive")
+    )
+    if not location:
+        raise StoresBusinessRuleError("Storage location not found")
 
     if location.is_active is not True:
         raise StoresBusinessRuleError("Selected storage location is inactive")
 
     return location
+
+
+def _validate_batch_number_format(batch_number: str) -> str:
+    parts = [part.strip() for part in batch_number.split("/")]
+    required_prefixes = ("DRW-", "SO-", "CUST-", "HEAT-")
+
+    if len(parts) != 4 or any(not part for part in parts):
+        raise StoresBusinessRuleError(
+            "Batch number must follow format: DRW-XXXX / SO-XX-XXX / CUST-XXX / HEAT-XX"
+        )
+
+    for part, prefix in zip(parts, required_prefixes):
+        if not part.startswith(prefix) or len(part) <= len(prefix):
+            raise StoresBusinessRuleError(
+                "Batch number must follow format: DRW-XXXX / SO-XX-XXX / CUST-XXX / HEAT-XX"
+            )
+
+    return " / ".join(parts)
 
 
 def create_grn(
@@ -103,6 +110,7 @@ def create_grn(
     grn_number: str,
     purchase_order_id: int,
     supplier_id: int,
+    storage_location_id: int,
     grn_date: date,
     created_by: int | None = None,
 ) -> GRN:
@@ -119,10 +127,17 @@ def create_grn(
     if purchase_order.status != PurchaseOrderStatus.ISSUED:
         raise StoresBusinessRuleError("Cannot create GRN unless PurchaseOrder status is Issued")
 
+    _get_active_storage_location(db, storage_location_id)
+
+    if created_by is None:
+        raise StoresBusinessRuleError("Received by user is required")
+
     grn = GRN(
         grn_number=grn_number,
         purchase_order_id=purchase_order_id,
         supplier_id=supplier_id,
+        received_by=created_by,
+        received_datetime=_utc_now(),
         grn_date=grn_date,
         status=GRNStatus.DRAFT,
         created_by=created_by,
@@ -149,13 +164,15 @@ def add_grn_item(
 ) -> GRNItem:
     _get_grn(db, grn_id)
 
+    normalized_batch_number = _validate_batch_number_format(batch_number)
+
     if accepted_quantity + rejected_quantity != received_quantity:
         raise StoresBusinessRuleError("Accepted quantity plus rejected quantity must equal received quantity")
 
     existing_batch_for_grn = db.scalar(
         select(GRNItem.id).where(
             GRNItem.grn_id == grn_id,
-            GRNItem.batch_number == batch_number,
+            GRNItem.batch_number == normalized_batch_number,
             GRNItem.is_deleted.is_(False),
         )
     )
@@ -167,7 +184,7 @@ def add_grn_item(
         item_code=item_code,
         description=description,
         heat_number=heat_number,
-        batch_number=batch_number,
+        batch_number=normalized_batch_number,
         received_quantity=received_quantity,
         accepted_quantity=accepted_quantity,
         rejected_quantity=rejected_quantity,
@@ -242,6 +259,8 @@ def perform_rmir_inspection(
         )
         if not mtc_verification:
             raise StoresBusinessRuleError("Cannot accept RMIR until MTC verification is completed")
+        if storage_location_id is None:
+            raise StoresBusinessRuleError("storage_location_id is required when inspection_status is Accepted")
 
     rmir = db.scalar(
         select(RMIR).where(
@@ -274,7 +293,7 @@ def perform_rmir_inspection(
         if accepted_qty <= 0:
             raise StoresBusinessRuleError("Accepted quantity must be greater than zero for inventory posting")
 
-        storage_location = _resolve_active_storage_location(db, storage_location_id)
+        storage_location = _get_active_storage_location(db, storage_location_id)
 
         batch_inventory = db.scalar(
             select(BatchInventory).where(
