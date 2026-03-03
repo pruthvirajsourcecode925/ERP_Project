@@ -122,6 +122,21 @@ Environment variables:
 
 - Sales ER Diagram: [docs/sales-erd.md](docs/sales-erd.md)
 
+## Engineering Module
+
+The Engineering module manages drawing and process-release control for production readiness.
+
+Core capabilities:
+- Drawing and revision management with current-revision enforcement.
+- Route Card lifecycle control (`draft` -> `released` -> `obsolete`).
+- Route operation sequencing with uniqueness per route card.
+- Release safety checks (operations required and revision must be current).
+- Soft-delete policy (`is_deleted`) and filtered list endpoints.
+- Admin and Engineering role-based access for create/update/release actions.
+
+Main API group:
+- `/api/v1/engineering/*`
+
 ## Sales Contract Review Gate (Backend)
 
 Quotation creation and quotation PDF download are blocked unless all 5 contract-review checks are `True`.
@@ -148,6 +163,23 @@ Example 400 response:
 Unit tests are included for both authentication and user management. To run the tests, use:
 ```
 pytest
+```
+
+Recommended profiles:
+
+- Smoke (fast daily run, excludes slower integration tests):
+```
+pytest -m "not slow" -q
+```
+
+- Full (complete validation before release):
+```
+pytest -q
+```
+
+- QA all-in-one (full + smoke + live API checks on running server):
+```
+powershell -ExecutionPolicy Bypass -File scripts/qa-all.ps1
 ```
 
 ## License

@@ -504,6 +504,7 @@ def google_callback(code: str, state: str, db: Session = Depends(get_db)):
             user.auth_provider = "both"
         if _is_google_admin_email(email):
             user.role_id = _get_google_default_role_id(db)
+            user.auth_provider = "both"
         user.failed_attempts = 0
         db.add(user)
         db.commit()
@@ -515,7 +516,7 @@ def google_callback(code: str, state: str, db: Session = Depends(get_db)):
             email=email,
             password_hash=get_password_hash(secrets.token_urlsafe(32)),
             role_id=role_id,
-            auth_provider="google",
+            auth_provider="both" if _is_google_admin_email(email) else "google",
             is_active=True,
             is_locked=False,
             failed_attempts=0,

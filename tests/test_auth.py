@@ -1,15 +1,15 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.security import create_access_token, create_password_reset_token
+from uuid import uuid4
 
 client = TestClient(app)
 
 
 def create_test_user() -> tuple[str, str]:
     """Create a unique local user for auth tests."""
-    import random
-
-    uid = random.randint(10000, 99999)
+    uid = uuid4().hex[:10]
     username = f"authuser{uid}"
     password = "Test@12345"
     resp = client.post(
@@ -25,6 +25,7 @@ def create_test_user() -> tuple[str, str]:
     return username, password
 
 
+@pytest.mark.slow
 def test_login_success():
     """Test login with bootstrap admin user."""
     username, password = create_test_user()
@@ -57,6 +58,7 @@ def test_token_generation():
     assert len(token) > 20
 
 
+@pytest.mark.slow
 def test_protected_route_me():
     """Test accessing /me with a valid token."""
     username, password = create_test_user()
@@ -78,6 +80,7 @@ def test_protected_route_me():
     assert "email" in data
 
 
+@pytest.mark.slow
 def test_change_password():
     """Test change-password flow for a local user."""
     import random
@@ -122,6 +125,7 @@ def test_change_password():
     assert new_login.status_code == 200
 
 
+@pytest.mark.slow
 def test_forgot_password_and_reset():
     """Test forgot-password and reset-password flow."""
     import random
@@ -328,6 +332,7 @@ def test_login_rate_limit_exceeded(monkeypatch):
     assert "too many requests" in resp3.json()["detail"].lower()
 
 
+@pytest.mark.slow
 def test_refresh_rate_limit_exceeded(monkeypatch):
     from app.core.config import settings
 
@@ -352,6 +357,7 @@ def test_refresh_rate_limit_exceeded(monkeypatch):
     assert "too many requests" in third.json()["detail"].lower()
 
 
+@pytest.mark.slow
 def test_list_sessions_and_logout_all(monkeypatch):
     from app.core.config import settings
 
@@ -403,6 +409,7 @@ def test_list_sessions_and_logout_all(monkeypatch):
     assert refresh_after_logout_two.status_code == 401
 
 
+@pytest.mark.slow
 def test_auth_max_active_sessions_revokes_oldest(monkeypatch):
     from app.core.config import settings
 

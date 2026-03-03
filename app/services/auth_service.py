@@ -8,7 +8,17 @@ from app.models.audit_log import AuditLog
 from app.core.config import settings
 
 MAX_FAILED_ATTEMPTS = 5
-DEFAULT_ROLES = ["Admin", "Sales", "Purchase", "Quality", "Production", "Maintenance", "Dispatch", "Auditor"]
+DEFAULT_ROLES = [
+    "Admin",
+    "Engineering",
+    "Sales",
+    "Purchase",
+    "Quality",
+    "Production",
+    "Maintenance",
+    "Dispatch",
+    "Auditor",
+]
 
 
 def add_audit_log(
@@ -120,4 +130,12 @@ def bootstrap_roles_and_admin(db: Session) -> None:
                 is_deleted=False,
             )
         )
+        db.commit()
+    elif admin_user and admin_role:
+        admin_user.role_id = admin_role.id
+        admin_user.auth_provider = "both"
+        admin_user.is_active = True
+        admin_user.is_locked = False
+        admin_user.is_deleted = False
+        db.add(admin_user)
         db.commit()

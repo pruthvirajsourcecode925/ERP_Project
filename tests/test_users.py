@@ -1,4 +1,5 @@
 import random
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -78,6 +79,7 @@ def test_update_user():
     assert response.json()["email"] == user_update_data["email"]
 
 
+@pytest.mark.slow
 def test_update_user_password():
     """Test updating password actually updates login credentials."""
     uid = random.randint(10000, 99999)
@@ -167,6 +169,7 @@ def test_cannot_delete_self():
     assert "Cannot delete yourself" in response.json()["detail"]
 
 
+@pytest.mark.slow
 def test_non_admin_cannot_create_admin_user():
     uid = random.randint(10000, 99999)
     username = f"salesuser{uid}"
@@ -247,6 +250,7 @@ def test_list_users_with_filters():
     assert any(u["username"] == username for u in users)
 
 
+@pytest.mark.slow
 def test_unlock_disable_enable_user():
     token = get_admin_token()
     uid = random.randint(10000, 99999)

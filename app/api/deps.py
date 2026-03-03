@@ -80,7 +80,13 @@ def require_roles(*allowed_roles: str):
         db: Session = Depends(get_db),
     ) -> User:
         role = db.scalar(select(Role).where(Role.id == current_user.role_id))
-        if not role or role.name not in allowed_roles:
+        if not role:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+
+        if role.name == "Admin":
+            return current_user
+
+        if role.name not in allowed_roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
         return current_user
 

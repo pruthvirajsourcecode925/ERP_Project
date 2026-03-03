@@ -2,6 +2,7 @@ import random
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -33,13 +34,17 @@ from app.modules.sales.pdf.po_review_pdf import (
 client = TestClient(app)
 
 
+def _unique_seed_code() -> int:
+    return int(uuid4().hex[:8], 16)
+
+
 def _get_token_for_role(role_name: str) -> str:
     db = SessionLocal()
     try:
         role = db.scalar(select(Role).where(Role.name == role_name))
         assert role is not None
 
-        uid = random.randint(10000, 99999)
+        uid = uuid4().hex[:10]
         username = f"{role_name.lower()}user{uid}"
 
         user = User(
@@ -70,7 +75,7 @@ def _seed_sales_records(
 ) -> tuple[int, int, int, int, int]:
     db = SessionLocal()
     try:
-        code = seed_code or random.randint(10000, 99999)
+        code = seed_code or _unique_seed_code()
 
         customer = Customer(
             customer_code=f"CUST{code}",
@@ -154,7 +159,7 @@ def _seed_sales_upto_quotation(
 ) -> tuple[int, int, int, int]:
     db = SessionLocal()
     try:
-        code = seed_code or random.randint(10000, 99999)
+        code = seed_code or _unique_seed_code()
 
         customer = Customer(
             customer_code=f"CUST{code}",
@@ -596,7 +601,7 @@ def test_quotation_pdf_download_lists_only_failed_feasibility_items():
 
 def test_list_enquiries_supports_search_and_pagination():
     token = _get_token_for_role("Sales")
-    base = random.randint(60000, 69990)
+    base = _unique_seed_code()
     _seed_sales_upto_quotation(
         contract_status=ContractReviewStatus.APPROVED,
         all_checks_true=True,
@@ -633,7 +638,7 @@ def test_list_enquiries_supports_search_and_pagination():
 
 def test_list_quotations_supports_search_and_pagination():
     token = _get_token_for_role("Sales")
-    base = random.randint(70000, 79990)
+    base = _unique_seed_code()
     _seed_sales_upto_quotation(
         contract_status=ContractReviewStatus.APPROVED,
         all_checks_true=True,
@@ -670,7 +675,7 @@ def test_list_quotations_supports_search_and_pagination():
 
 def test_list_customer_po_reviews_supports_search_and_pagination():
     token = _get_token_for_role("Sales")
-    base = random.randint(80000, 89990)
+    base = _unique_seed_code()
     _seed_sales_records(
         contract_status=ContractReviewStatus.APPROVED,
         all_checks_true=True,
@@ -710,7 +715,7 @@ def test_list_customer_po_reviews_supports_search_and_pagination():
 
 def test_list_sales_orders_supports_search_and_pagination():
     token = _get_token_for_role("Sales")
-    base = random.randint(90000, 99990)
+    base = _unique_seed_code()
 
     customer_id, enquiry_id, contract_review_id, quotation_id, po_review_id = _seed_sales_records(
         contract_status=ContractReviewStatus.APPROVED,
