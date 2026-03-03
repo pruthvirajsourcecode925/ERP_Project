@@ -1,5 +1,7 @@
 # Purchase Module ER Diagram
 
+[← Back to ERD Index](index.md)
+
 This ERD reflects the current Purchase module backend.
 
 ```mermaid

@@ -1,5 +1,7 @@
 # Engineering Module ER Diagram
 
+[← Back to ERD Index](index.md)
+
 ```mermaid
 erDiagram
     users ||--o{ drawings : created_by_updated_by

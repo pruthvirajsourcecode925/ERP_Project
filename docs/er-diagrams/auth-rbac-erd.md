@@ -1,5 +1,7 @@
 # Auth & RBAC ER Diagram
 
+[← Back to ERD Index](index.md)
+
 ```mermaid
 erDiagram
     roles ||--o{ users : assigned

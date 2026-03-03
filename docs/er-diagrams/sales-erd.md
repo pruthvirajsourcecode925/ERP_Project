@@ -1,5 +1,7 @@
 # Sales Module ER Diagram
 
+[← Back to ERD Index](index.md)
+
 ```mermaid
 erDiagram
     users ||--o{ customers : created_by_updated_by
