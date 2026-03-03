@@ -7,6 +7,7 @@ All module ER diagrams are centralized under this folder.
 - Engineering: [engineering-erd.md](engineering-erd.md)
 - Sales: [sales-erd.md](sales-erd.md)
 - Purchase: [purchase-erd.md](purchase-erd.md)
+- Stores: [stores-erd.md](stores-erd.md)
 
 ## Update Rule
 - Before pushing code for a module, update its ER diagram in this folder.
