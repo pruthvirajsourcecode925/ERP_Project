@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+import re
+from datetime import date, datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
@@ -28,6 +31,42 @@ from app.services.engineering_service import (
 )
 
 router = APIRouter(prefix="/engineering", tags=["engineering"])
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
+def _route_card_imports_dir() -> Path:
+    return _project_root() / "imports" / "route_cards"
+
+
+def _sanitize_filename(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("._")
+    return cleaned or "route_card_document"
+
+
+def _ensure_route_card_path_in_imports(file_path: str) -> Path:
+    allowed_dir = _route_card_imports_dir().resolve()
+    resolved_file = Path(file_path).resolve()
+    if allowed_dir not in resolved_file.parents:
+        raise HTTPException(status_code=500, detail="Stored Route Card file path is outside allowed import folder")
+    return resolved_file
+
+
+def _build_route_card_document_response(route_card: RouteCard) -> FileResponse:
+    if not route_card.route_card_file_path:
+        raise HTTPException(status_code=404, detail="RouteCard document not uploaded")
+
+    file_path = _ensure_route_card_path_in_imports(route_card.route_card_file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="RouteCard document file not found")
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=route_card.route_card_file_content_type or "application/octet-stream",
+        filename=route_card.route_card_file_name or file_path.name,
+    )
 
 
 class DrawingCreate(BaseModel):
@@ -101,6 +140,9 @@ class RouteCardOut(BaseModel):
     status: RouteCardStatus
     released_by: int | None
     released_date: datetime | None
+    route_card_file_name: str | None
+    route_card_file_uploaded_at: datetime | None
+    route_card_file_content_type: str | None
 
     model_config = {"from_attributes": True}
 
@@ -285,21 +327,49 @@ def update_drawing_revision_endpoint(
 
 
 @router.post("/route-card", response_model=RouteCardOut, status_code=status.HTTP_201_CREATED)
-def create_route_card_endpoint(
-    payload: RouteCardCreate,
+async def create_route_card_endpoint(
+    route_number: str = Form(...),
+    drawing_revision_id: int = Form(...),
+    sales_order_id: int = Form(...),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Engineering", "Admin")),
 ):
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Uploaded Route Card file is empty")
+
     try:
         route_card = create_route_card(
             db,
-            route_number=payload.route_number,
-            drawing_revision_id=payload.drawing_revision_id,
-            sales_order_id=payload.sales_order_id,
+            route_number=route_number,
+            drawing_revision_id=drawing_revision_id,
+            sales_order_id=sales_order_id,
             created_by=current_user.id,
         )
     except EngineeringBusinessRuleError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+    original_name = file.filename or "route_card_document"
+    safe_original = _sanitize_filename(Path(original_name).name)
+    suffix = Path(safe_original).suffix or ".bin"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    safe_route_number = _sanitize_filename(route_card.route_number)
+    stored_name = f"route_card_{safe_route_number}_{route_card.id}_{timestamp}{suffix}"
+
+    imports_dir = _route_card_imports_dir()
+    imports_dir.mkdir(parents=True, exist_ok=True)
+    stored_path = (imports_dir / stored_name).resolve()
+    stored_path.write_bytes(payload)
+
+    route_card.route_card_file_name = safe_original
+    route_card.route_card_file_path = str(stored_path)
+    route_card.route_card_file_uploaded_at = datetime.now(timezone.utc)
+    route_card.route_card_file_content_type = file.content_type
+    route_card.updated_by = current_user.id
+    db.add(route_card)
+    db.commit()
+    db.refresh(route_card)
 
     add_audit_log(
         db=db,
@@ -307,10 +377,49 @@ def create_route_card_endpoint(
         action="ROUTE_CARD_CREATED",
         table_name="route_cards",
         record_id=route_card.id,
-        new_value={"route_number": route_card.route_number, "status": route_card.status.value},
+        new_value={
+            "route_number": route_card.route_number,
+            "status": route_card.status.value,
+            "route_card_file_name": route_card.route_card_file_name,
+            "route_card_file_path": route_card.route_card_file_path,
+        },
     )
 
     return route_card
+
+
+@router.get("/route-card/{route_card_id}/document/download")
+def download_route_card_document_endpoint(
+    route_card_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Engineering", "Admin")),
+):
+    route_card = db.scalar(
+        select(RouteCard).where(RouteCard.id == route_card_id, RouteCard.is_deleted.is_(False))
+    )
+    if not route_card:
+        raise HTTPException(status_code=404, detail="RouteCard not found")
+
+    return _build_route_card_document_response(route_card)
+
+
+@router.get("/route-card/document/download")
+def download_route_card_document_by_traceability_endpoint(
+    traceability: str = Query(..., min_length=1, description="Route number used as traceability reference"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_roles("Engineering", "Admin")),
+):
+    traceability_ref = traceability.strip()
+    route_card = db.scalar(
+        select(RouteCard).where(
+            RouteCard.route_number == traceability_ref,
+            RouteCard.is_deleted.is_(False),
+        )
+    )
+    if not route_card:
+        raise HTTPException(status_code=404, detail="RouteCard not found for provided traceability")
+
+    return _build_route_card_document_response(route_card)
 
 
 @router.patch("/route-card/{route_card_id}", response_model=RouteCardOut)
@@ -505,6 +614,7 @@ def list_drawings(
 
 @router.get("/route-card", response_model=list[RouteCardOut])
 def list_route_cards(
+    q: str | None = Query(None, min_length=1),
     status: RouteCardStatus | None = Query(None),
     drawing_id: int | None = Query(None),
     sales_order_id: int | None = Query(None),
@@ -514,6 +624,9 @@ def list_route_cards(
     current_user=Depends(require_roles("Engineering", "Admin")),
 ):
     stmt = select(RouteCard).where(RouteCard.is_deleted.is_(False))
+    if q:
+        pattern = f"%{q}%"
+        stmt = stmt.where(or_(RouteCard.route_number.ilike(pattern)))
     if status is not None:
         stmt = stmt.where(RouteCard.status == status)
     if drawing_id is not None:

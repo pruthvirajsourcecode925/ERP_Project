@@ -51,6 +51,10 @@ erDiagram
         enum status "draft|released|obsolete"
         bigint released_by FK "nullable"
         timestamptz released_date "nullable"
+        varchar route_card_file_name "nullable"
+        text route_card_file_path "nullable"
+        timestamptz route_card_file_uploaded_at "nullable"
+        varchar route_card_file_content_type "nullable"
     }
 
     route_operations {
@@ -84,6 +88,10 @@ erDiagram
         text remarks
     }
 ```
+
+## Notes
+- Uploaded/Imported Route Card PDFs are stored in a dedicated folder: `imports/route_cards`.
+- `route_cards` stores document metadata (`route_card_file_name`, `route_card_file_path`, `route_card_file_uploaded_at`, `route_card_file_content_type`) for controlled download and traceability.
 
 ## Navigation
 - Previous: [Auth & RBAC ERD](auth-rbac-erd.md)
