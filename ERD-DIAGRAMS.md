@@ -11,6 +11,17 @@ Primary ER diagrams are maintained in this backend repository:
 
 Rule: whenever schema changes are made in any module, update the corresponding ERD file before push.
 
+## Postman Module Collections
+- Auth lifecycle: [docs/postman/AS9100D-Auth-Lifecycle.postman_collection.json](docs/postman/AS9100D-Auth-Lifecycle.postman_collection.json)
+- Users & Roles admin: [docs/postman/AS9100D-Users-Roles-Admin.postman_collection.json](docs/postman/AS9100D-Users-Roles-Admin.postman_collection.json)
+- Sales lifecycle: [docs/postman/AS9100D-Sales-Lifecycle.postman_collection.json](docs/postman/AS9100D-Sales-Lifecycle.postman_collection.json)
+- Purchase lifecycle: [docs/postman/AS9100D-Purchase-Lifecycle.postman_collection.json](docs/postman/AS9100D-Purchase-Lifecycle.postman_collection.json)
+- Engineering lifecycle: [docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json](docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json)
+- Stores lifecycle: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
+
 ## Stores Operations
 - Stores SOP: [docs/stores-operations-sop.md](docs/stores-operations-sop.md)
 - Stores Postman collection: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
+
+## Engineering Operations
+- Engineering Route Card Postman collection: [docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json](docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json)

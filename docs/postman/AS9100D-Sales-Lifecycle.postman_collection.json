@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "AS9100D Sales Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sales flow: enquiry, contract review, quotation, PO review, sales order, and PDF downloads."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "customer_id", "value": "1" },
+    { "key": "enquiry_id", "value": "" },
+    { "key": "contract_review_id", "value": "" },
+    { "key": "quotation_id", "value": "" },
+    { "key": "po_review_id", "value": "" },
+    { "key": "quotation_number", "value": "QTN-POSTMAN-001" }
+  ],
+  "item": [
+    {
+      "name": "Create Enquiry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('enquiry_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enquiry_number\": \"ENQ-POSTMAN-001\",\n  \"customer_id\": {{customer_id}},\n  \"enquiry_date\": \"2026-03-05\",\n  \"requested_delivery_date\": \"2026-03-20\",\n  \"currency\": \"INR\",\n  \"notes\": \"Postman sales lifecycle\",\n  \"status\": \"draft\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/enquiry",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "enquiry"]
+        }
+      }
+    },
+    {
+      "name": "Create Contract Review",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('contract_review_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enquiry_id\": {{enquiry_id}},\n  \"status\": \"approved\",\n  \"scope_clarity_ok\": true,\n  \"capability_ok\": true,\n  \"capacity_ok\": true,\n  \"delivery_commitment_ok\": true,\n  \"quality_requirements_ok\": true,\n  \"review_comments\": \"All checks approved\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/contract-review",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "contract-review"]
+        }
+      }
+    },
+    {
+      "name": "Create Quotation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('quotation_id', data.id);",
+              "pm.environment.set('quotation_number', data.quotation_number);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quotation_number\": \"{{quotation_number}}\",\n  \"enquiry_id\": {{enquiry_id}},\n  \"contract_review_id\": {{contract_review_id}},\n  \"customer_id\": {{customer_id}},\n  \"issue_date\": \"2026-03-05\",\n  \"valid_until\": \"2026-03-20\",\n  \"currency\": \"INR\",\n  \"subtotal\": \"1000.00\",\n  \"total_amount\": \"1000.00\",\n  \"status\": \"draft\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/quotation",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "quotation"]
+        }
+      }
+    },
+    {
+      "name": "List Quotations",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/quotation?q={{quotation_number}}&skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "quotation"],
+          "query": [
+            { "key": "q", "value": "{{quotation_number}}" },
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download Quotation PDF",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/quotation/{{quotation_id}}/download",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "quotation", "{{quotation_id}}", "download"]
+        }
+      }
+    },
+    {
+      "name": "Create Customer PO Review",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('po_review_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quotation_id\": {{quotation_id}},\n  \"customer_po_number\": \"CPO-POSTMAN-001\",\n  \"customer_po_date\": \"2026-03-05\",\n  \"accepted\": true,\n  \"status\": \"accepted\",\n  \"deviation_notes\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/customer-po-review",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "customer-po-review"]
+        }
+      }
+    },
+    {
+      "name": "Download Customer PO Review PDF",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/customer-po-review/{{po_review_id}}/download",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "customer-po-review", "{{po_review_id}}", "download"]
+        }
+      }
+    },
+    {
+      "name": "Create Sales Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sales_order_number\": \"SO-POSTMAN-001\",\n  \"customer_id\": {{customer_id}},\n  \"enquiry_id\": {{enquiry_id}},\n  \"contract_review_id\": {{contract_review_id}},\n  \"quotation_id\": {{quotation_id}},\n  \"customer_po_review_id\": {{po_review_id}},\n  \"order_date\": \"2026-03-05\",\n  \"currency\": \"INR\",\n  \"total_amount\": \"1000.00\",\n  \"status\": \"draft\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/sales-order",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "sales-order"]
+        }
+      }
+    },
+    {
+      "name": "List Sales Orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/sales/sales-order?q=SO-POSTMAN&skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "sales", "sales-order"],
+          "query": [
+            { "key": "q", "value": "SO-POSTMAN" },
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    }
+  ]
+}

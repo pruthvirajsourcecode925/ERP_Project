@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "AS9100D Purchase Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Purchase flow: supplier onboarding, approval, PO creation, itemization, status transition, and summary."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "supplier_id", "value": "" },
+    { "key": "purchase_order_id", "value": "" },
+    { "key": "supplier_code", "value": "SUP-POSTMAN-001" }
+  ],
+  "item": [
+    {
+      "name": "Create Supplier",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('supplier_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplier_code\": \"{{supplier_code}}\",\n  \"supplier_name\": \"Postman Supplier\",\n  \"contact_person\": \"QA User\",\n  \"phone\": \"9999999999\",\n  \"email\": \"purchase.postman@example.com\",\n  \"address\": \"Industrial Area\",\n  \"is_approved\": false,\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/supplier",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "supplier"]
+        }
+      }
+    },
+    {
+      "name": "Approve Supplier",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"approved\": true,\n  \"approval_remarks\": \"AS9100D supplier quality controls accepted\",\n  \"quality_acknowledged\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/supplier/{{supplier_id}}/approve",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "supplier", "{{supplier_id}}", "approve"]
+        }
+      }
+    },
+    {
+      "name": "Create Purchase Order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('purchase_order_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"supplier_id\": {{supplier_id}},\n  \"po_date\": \"2026-03-05\",\n  \"expected_delivery_date\": \"2026-03-25\",\n  \"remarks\": \"Postman purchase flow\",\n  \"quality_notes\": \"Supplier quality clauses acknowledged\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order"]
+        }
+      }
+    },
+    {
+      "name": "Add PO Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"description\": \"Raw material lot A\",\n  \"quantity\": \"10.000\",\n  \"unit_price\": \"150.00\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order/{{purchase_order_id}}/item",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order", "{{purchase_order_id}}", "item"]
+        }
+      }
+    },
+    {
+      "name": "Issue Purchase Order",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"issued\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order/{{purchase_order_id}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order", "{{purchase_order_id}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "Get Purchase Order Detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order/{{purchase_order_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order", "{{purchase_order_id}}"]
+        }
+      }
+    },
+    {
+      "name": "List Purchase Orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order?status=issued&skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order"],
+          "query": [
+            { "key": "status", "value": "issued" },
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Close Purchase Order",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"closed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/order/{{purchase_order_id}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "order", "{{purchase_order_id}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "Purchase Summary",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/purchase/summary",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "purchase", "summary"]
+        }
+      }
+    }
+  ]
+}

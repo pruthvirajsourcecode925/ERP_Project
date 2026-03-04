@@ -105,6 +105,15 @@ Use the collection at [docs/postman/AS9100D-Auth-Lifecycle.postman_collection.js
 - logout refresh-token revocation
 - refresh failure after logout
 
+### Postman Module Collections
+
+- Auth: [docs/postman/AS9100D-Auth-Lifecycle.postman_collection.json](docs/postman/AS9100D-Auth-Lifecycle.postman_collection.json)
+- Users & Roles: [docs/postman/AS9100D-Users-Roles-Admin.postman_collection.json](docs/postman/AS9100D-Users-Roles-Admin.postman_collection.json)
+- Sales: [docs/postman/AS9100D-Sales-Lifecycle.postman_collection.json](docs/postman/AS9100D-Sales-Lifecycle.postman_collection.json)
+- Purchase: [docs/postman/AS9100D-Purchase-Lifecycle.postman_collection.json](docs/postman/AS9100D-Purchase-Lifecycle.postman_collection.json)
+- Engineering: [docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json](docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json)
+- Stores: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
+
 ### Auth Rate Limiter Backend
 
 Rate limiting supports two backends:
@@ -143,6 +152,9 @@ Core capabilities:
 
 Main API group:
 - `/api/v1/engineering/*`
+
+Postman validation collection:
+- [docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json](docs/postman/AS9100D-Engineering-RouteCard-Lifecycle.postman_collection.json)
 
 ## Sales Contract Review Gate (Backend)
 
