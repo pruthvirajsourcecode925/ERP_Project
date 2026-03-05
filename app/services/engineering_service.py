@@ -12,6 +12,7 @@ from app.modules.engineering.models import (
     RouteCardStatus,
     RouteOperation,
 )
+from app.modules.sales.models import SalesOrder
 from app.services.auth_service import add_audit_log
 
 
@@ -68,6 +69,15 @@ def create_route_card(
 
     if not drawing_revision.is_current:
         raise EngineeringBusinessRuleError("Drawing revision must be current before route creation")
+
+    sales_order_exists = db.scalar(
+        select(SalesOrder.id).where(
+            SalesOrder.id == sales_order_id,
+            SalesOrder.is_deleted.is_(False),
+        )
+    )
+    if not sales_order_exists:
+        raise EngineeringBusinessRuleError("Sales order not found")
 
     route_card = RouteCard(
         route_number=route_number,

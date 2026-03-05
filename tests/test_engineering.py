@@ -442,6 +442,37 @@ def test_engineering_route_card_rejects_non_current_revision():
     assert route.status_code == 400
 
 
+def test_engineering_route_card_rejects_missing_sales_order():
+    token = _get_admin_token()
+    suffix = random.randint(100000, 999999)
+
+    draw = client.post(
+        "/api/v1/engineering/drawing",
+        json={"drawing_number": f"DRW-NSO-{suffix}", "part_name": "NSO Part", "is_active": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert draw.status_code == 201
+    drawing_id = draw.json()["id"]
+
+    rev = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "A", "file_path": "/tmp/nso-a.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev.status_code == 201
+    revision_id = rev.json()["id"]
+
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-NSO-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=999999999999,
+        filename="route_card_missing_so.pdf",
+    )
+    assert route.status_code == 400
+    assert route.json()["detail"] == "Sales order not found"
+
+
 def test_engineering_validate_route_card_for_production_rejects_draft():
     token = _get_admin_token()
     sales_order_id = _seed_sales_order()
