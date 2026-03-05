@@ -20,7 +20,7 @@ Rule: whenever schema changes are made in any module, update the corresponding E
 - Stores lifecycle: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
 
 ## Stores Operations
-- Stores SOP: [docs/stores-operations-sop.md](docs/stores-operations-sop.md)
+- Stores SOP: [docs/sop/stores-operations-sop.md](docs/sop/stores-operations-sop.md)
 - Stores Postman collection: [docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json](docs/postman/AS9100D-Stores-Lifecycle.postman_collection.json)
 
 ## Engineering Operations
