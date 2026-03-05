@@ -81,6 +81,8 @@ class PurchaseOrder(Base, PurchaseAuditMixin):
     total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), default=Decimal("0.00"), nullable=False)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     quality_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    supplier_quality_requirements: Mapped[str | None] = mapped_column(Text, nullable=True)
+    po_document_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         CheckConstraint("total_amount >= 0", name="ck_purchase_orders_total_amount_gte_zero"),

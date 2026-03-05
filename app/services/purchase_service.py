@@ -2,16 +2,32 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.user import User
 from app.modules.purchase.models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, Supplier
 
 
 class PurchaseBusinessRuleError(Exception):
     pass
+
+
+DEFAULT_SUPPLIER_QUALITY_REQUIREMENTS = (
+    "1. Certificate of Conformance (CoC) required with each shipment.\n"
+    "2. Material and process traceability must be maintained.\n"
+    "3. Supplier must notify Buyer of nonconforming product or process changes.\n"
+    "4. Buyer / Customer / Authorities retain right of access for audit."
+)
+
+
+def _resolve_supplier_quality_requirements(value: str | None) -> str:
+    if value and value.strip():
+        return value.strip()
+    return DEFAULT_SUPPLIER_QUALITY_REQUIREMENTS
 
 
 def _validate_po_dates(*, po_date: date, expected_delivery_date: date | None) -> None:
@@ -148,6 +164,7 @@ def create_purchase_order(
     expected_delivery_date: date | None = None,
     remarks: str | None = None,
     quality_notes: str | None = None,
+    supplier_quality_requirements: str | None = None,
     created_by: int | None = None,
 ) -> PurchaseOrder:
     supplier = _get_supplier(db, supplier_id)
@@ -184,6 +201,7 @@ def create_purchase_order(
         total_amount=Decimal("0.00"),
         remarks=remarks,
         quality_notes=quality_notes.strip() if quality_notes else None,
+        supplier_quality_requirements=_resolve_supplier_quality_requirements(supplier_quality_requirements),
         created_by=created_by,
         updated_by=created_by,
     )
@@ -378,6 +396,87 @@ def soft_delete_po(
     po.updated_by = updated_by
     db.add(po)
     db.commit()
+
+
+def save_purchase_order_document_path(
+    db: Session,
+    *,
+    purchase_order_id: int,
+    generated_file_path: str,
+    updated_by: int | None = None,
+) -> PurchaseOrder:
+    if not generated_file_path or not generated_file_path.strip():
+        raise PurchaseBusinessRuleError("Generated purchase order file path is required")
+
+    po = _get_purchase_order(db, purchase_order_id)
+
+    if po.po_document_path:
+        return po
+
+    po.po_document_path = generated_file_path
+    po.updated_by = updated_by
+    db.add(po)
+    db.commit()
+    db.refresh(po)
+    return po
+
+
+def generate_purchase_order_pdf(
+    db: Session,
+    *,
+    purchase_order: PurchaseOrder,
+    pdf_builder: Callable[..., str],
+    updated_by: int | None = None,
+) -> str:
+    if purchase_order.po_document_path:
+        return purchase_order.po_document_path
+
+    supplier = db.scalar(
+        select(Supplier).where(
+            Supplier.id == purchase_order.supplier_id,
+            Supplier.is_deleted.is_(False),
+        )
+    )
+    supplier_name = supplier.supplier_name if supplier else f"Supplier ID {purchase_order.supplier_id}"
+
+    created_by_name = "-"
+    if purchase_order.created_by:
+        buyer = db.scalar(
+            select(User).where(
+                User.id == purchase_order.created_by,
+                User.is_deleted.is_(False),
+            )
+        )
+        if buyer:
+            created_by_name = buyer.username
+        else:
+            created_by_name = f"User ID {purchase_order.created_by}"
+
+    items = db.scalars(
+        select(PurchaseOrderItem).where(
+            PurchaseOrderItem.purchase_order_id == purchase_order.id,
+            PurchaseOrderItem.is_deleted.is_(False),
+        )
+    ).all()
+
+    generated_file_path = pdf_builder(
+        po=purchase_order,
+        supplier_name=supplier_name,
+        created_by_name=created_by_name,
+        supplier_contact_person=supplier.contact_person if supplier else None,
+        supplier_address=supplier.address if supplier else None,
+        supplier_email=supplier.email if supplier else None,
+        supplier_phone=supplier.phone if supplier else None,
+        items=items,
+    )
+
+    saved_po = save_purchase_order_document_path(
+        db,
+        purchase_order_id=purchase_order.id,
+        generated_file_path=generated_file_path,
+        updated_by=updated_by,
+    )
+    return saved_po.po_document_path or generated_file_path
 
 
 def get_purchase_summary(db: Session) -> dict[str, int]:

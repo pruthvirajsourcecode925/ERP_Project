@@ -12,6 +12,12 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from app.modules.sales.pdf.quotation_config import COMPANY_INFO, LOGO_PATH
+
+
+def _project_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
 
 @dataclass
 class QuotationLineItem:
@@ -38,14 +44,6 @@ class QuotationPDFPayload:
     coc_required: bool
     traceability_required: bool
     terms_and_conditions: list[str]
-
-
-def _project_root() -> Path:
-    return Path(__file__).resolve().parents[4]
-
-
-def _logo_path() -> Path:
-    return Path(__file__).resolve().parents[3] / "assets" / "logo.png"
 
 
 def _as_money(value: Decimal) -> str:
@@ -115,13 +113,17 @@ def generate_quotation_pdf(payload: QuotationPDFPayload) -> dict[str, str]:
 
     # 1-3) Header: logo left, company centered, document box right
     logo_cell = Paragraph("", normal)
-    logo = _logo_path()
-    if logo.exists():
-        logo_cell = Image(str(logo), width=120, height=48)
+    if LOGO_PATH.exists():
+        logo_cell = Image(str(LOGO_PATH), width=120, height=48)
+
+    company_name = COMPANY_INFO.get("name", "Company Name")
+    website = COMPANY_INFO.get("website", "")
+    company_lines = [company_name]
+    if website:
+        company_lines.append(f"Website: {website}")
 
     company_block = Paragraph(
-        "<b>MAULI INDUSTRIES</b><br/>"
-        "Website: www.mauliind.mfg@gmail.com",
+        "<br/>".join([f"<b>{company_lines[0]}</b>"] + company_lines[1:]),
         ParagraphStyle("CompanyBlock", parent=normal, alignment=1, fontSize=11, leading=13),
     )
 
@@ -165,15 +167,17 @@ def generate_quotation_pdf(payload: QuotationPDFPayload) -> dict[str, str]:
     story.append(Spacer(1, 4))
 
     # 4) Two-column company/customer section
+    address_lines = COMPANY_INFO.get("address_lines", [])
+    email = COMPANY_INFO.get("email", "")
+    phone = COMPANY_INFO.get("phone", "")
+    company_info_lines = [company_name]
+    company_info_lines.extend(address_lines)
+    if email:
+        company_info_lines.append(f"Email: {email}")
+    if phone:
+        company_info_lines.append(f"Mobile: {phone}")
     company_info_block = Paragraph(
-        "<b>Company Info</b><br/>"
-        "MAULI INDUSTRIES<br/>"
-        "Plot no. H3/1<br/>"
-        "NEARS AIMA OFFICE<br/>"
-        "MIDC Ambad<br/>"
-        "Nashik-422009<br/>"
-        "Email: mauliind.mfg@gmail.com<br/>"
-        "Mobile: +91-9604091397",
+        "<b>Company Info</b><br/>" + "<br/>".join(company_info_lines),
         normal,
     )
 

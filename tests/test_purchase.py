@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,11 @@ from app.core.security import create_access_token, get_password_hash
 from app.db.session import SessionLocal
 from app.models.role import Role
 from app.models.user import User
+from app.modules.purchase.models import PurchaseOrder
+from app.services.purchase_service import (
+    DEFAULT_SUPPLIER_QUALITY_REQUIREMENTS,
+    save_purchase_order_document_path,
+)
 
 client = TestClient(app)
 
@@ -305,6 +311,25 @@ def test_purchase_po_create_successfully():
     po = _create_po(token, supplier["id"])
     assert po["status"] == "draft"
     assert po["total_amount"] == "0.00"
+
+
+def test_purchase_po_create_applies_multiline_default_quality_requirements():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=True)
+
+    resp = client.post(
+        "/api/v1/purchase/order",
+        json={
+            "supplier_id": supplier["id"],
+            "po_date": date.today().isoformat(),
+            "quality_notes": "Quality requirements accepted",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 201, resp.text
+    po = resp.json()
+    assert po["supplier_quality_requirements"] == DEFAULT_SUPPLIER_QUALITY_REQUIREMENTS
+    assert "\n" in po["supplier_quality_requirements"]
 
 
 def test_purchase_po_duplicate_open_same_supplier_and_sales_order_blocked():
@@ -652,3 +677,119 @@ def test_purchase_summary_endpoint_returns_counts():
         "total_closed_pos",
     }
     assert all(isinstance(body[k], int) for k in body)
+
+
+def test_purchase_po_document_path_saved_only_once_on_first_generation():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=True)
+    po = _create_po(token, supplier["id"])
+
+    db = SessionLocal()
+    try:
+        first_saved = save_purchase_order_document_path(
+            db,
+            purchase_order_id=po["id"],
+            generated_file_path="/tmp/po_first_generation.pdf",
+        )
+        assert first_saved.po_document_path == "/tmp/po_first_generation.pdf"
+
+        second_attempt = save_purchase_order_document_path(
+            db,
+            purchase_order_id=po["id"],
+            generated_file_path="/tmp/po_second_generation.pdf",
+        )
+        assert second_attempt.po_document_path == "/tmp/po_first_generation.pdf"
+    finally:
+        db.close()
+
+
+def test_purchase_po_download_generates_once_and_reuses_stored_path():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=True)
+    po = _create_po(token, supplier["id"])
+    _add_item(token, po["id"], quantity="2", unit_price="100.00")
+    issue_resp = client.put(
+        f"/api/v1/purchase/order/{po['id']}/status",
+        json={"status": "issued"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert issue_resp.status_code == 200
+
+    first_download = client.get(
+        f"/api/v1/purchase/order/{po['id']}/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert first_download.status_code == 200
+    assert "application/pdf" in first_download.headers.get("content-type", "")
+
+    db = SessionLocal()
+    try:
+        po_record = db.scalar(select(PurchaseOrder).where(PurchaseOrder.id == po["id"]))
+        assert po_record is not None
+        assert po_record.po_document_path is not None
+        first_path = po_record.po_document_path
+        first_file = Path(first_path).resolve()
+        assert first_file.exists()
+        assert first_file.name == f"{po['po_number']}.pdf"
+        assert first_file.parent.name == "purchase_orders"
+        assert first_file.parent.parent.name == "exports"
+    finally:
+        db.close()
+
+    second_download = client.get(
+        f"/api/v1/purchase/order/{po['id']}/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert second_download.status_code == 200
+    assert "application/pdf" in second_download.headers.get("content-type", "")
+
+    db = SessionLocal()
+    try:
+        po_record = db.scalar(select(PurchaseOrder).where(PurchaseOrder.id == po["id"]))
+        assert po_record is not None
+        assert po_record.po_document_path == first_path
+    finally:
+        db.close()
+
+
+def test_purchase_po_download_rejected_for_draft_status():
+    token = _get_admin_token()
+    supplier = _create_supplier(token, is_approved=True)
+    po = _create_po(token, supplier["id"])
+    _add_item(token, po["id"], quantity="1", unit_price="10.00")
+
+    resp = client.get(
+        f"/api/v1/purchase/order/{po['id']}/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+    assert "Issued or Closed" in resp.json()["detail"]
+
+
+def test_download_purchase_order_pdf():
+    token = _get_admin_token()
+
+    supplier = _create_supplier(token, is_approved=False)
+    approved_supplier = _approve_supplier(token, supplier["id"])
+    assert approved_supplier["is_approved"] is True
+
+    po = _create_po(token, supplier["id"])
+    _add_item(token, po["id"], quantity="2", unit_price="100.00")
+
+    issue_resp = client.put(
+        f"/api/v1/purchase/order/{po['id']}/status",
+        json={"status": "issued"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert issue_resp.status_code == 200
+
+    download_resp = client.get(
+        f"/api/v1/purchase/order/{po['id']}/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert download_resp.status_code == 200
+    assert "application/pdf" in download_resp.headers.get("content-type", "")
+    content_disposition = download_resp.headers.get("content-disposition", "")
+    assert po["po_number"] in content_disposition
+    assert ".pdf" in content_disposition
