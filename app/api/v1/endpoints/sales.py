@@ -144,10 +144,11 @@ class QuotationCreate(BaseModel):
     valid_until: date
     currency: str
     subtotal: Decimal = Decimal("0.00")
-    tax_amount: Decimal = Decimal("0.00")
     total_amount: Decimal = Decimal("0.00")
     pdf_url: str | None = None
     status: QuotationStatus = QuotationStatus.DRAFT
+
+    model_config = {"extra": "forbid"}
 
 
 class QuotationOut(BaseModel):
@@ -399,7 +400,7 @@ def create_quotation_endpoint(
             valid_until=payload.valid_until,
             currency=payload.currency,
             subtotal=payload.subtotal,
-            tax_amount=payload.tax_amount,
+            tax_amount=Decimal("0.00"),
             total_amount=payload.total_amount,
             pdf_url=payload.pdf_url,
             status=payload.status,

@@ -228,7 +228,6 @@ def generate_quotation_pdf(payload: QuotationPDFPayload) -> dict[str, str]:
 
     grand_total = subtotal + payload.gst_amount
     line_table.append(["", "", "", "", "Subtotal", _as_money(subtotal)])
-    line_table.append(["", "", "", "", "GST", _as_money(payload.gst_amount)])
     line_table.append(["", "", "", "", "Grand Total", _as_money(grand_total)])
 
     items_table = Table(line_table, repeatRows=1, colWidths=[16 * mm, 86 * mm, 20 * mm, 16 * mm, 26 * mm, 30 * mm])
@@ -240,7 +239,7 @@ def generate_quotation_pdf(payload: QuotationPDFPayload) -> dict[str, str]:
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("ALIGN", (0, 1), (0, -1), "CENTER"),
                 ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                ("FONTNAME", (4, -3), (5, -1), "Helvetica-Bold"),
+                ("FONTNAME", (4, -2), (5, -1), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8.5),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]

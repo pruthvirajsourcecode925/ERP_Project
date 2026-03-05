@@ -148,6 +148,28 @@ def _seed_sales_order() -> int:
         db.close()
 
 
+def _create_route_card_with_document(
+    *,
+    token: str,
+    route_number: str,
+    drawing_revision_id: int,
+    sales_order_id: int,
+    filename: str = "route_card.pdf",
+    content: bytes = b"Route card content",
+    content_type: str = "application/pdf",
+):
+    return client.post(
+        "/api/v1/engineering/route-card",
+        data={
+            "route_number": route_number,
+            "drawing_revision_id": str(drawing_revision_id),
+            "sales_order_id": str(sales_order_id),
+        },
+        files={"file": (filename, content, content_type)},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+
 def test_engineering_drawing_uniqueness_and_current_revision_rules():
     token = _get_admin_token()
     suffix = random.randint(100000, 999999)
@@ -220,14 +242,13 @@ def test_engineering_route_card_release_and_post_release_guards():
     assert rev.status_code == 201
     revision_id = rev.json()["id"]
 
-    route = client.post(
-        "/api/v1/engineering/route-card",
-        json={
-            "route_number": f"RC-{suffix}",
-            "drawing_revision_id": revision_id,
-            "sales_order_id": sales_order_id,
-        },
-        headers={"Authorization": f"Bearer {token}"},
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_release.pdf",
+        content=b"Route card release content",
     )
     assert route.status_code == 201
     route_card_id = route.json()["id"]
@@ -341,14 +362,12 @@ def test_engineering_soft_delete_and_list_filters_pagination():
     assert rev.status_code == 201
     revision_id = rev.json()["id"]
 
-    route = client.post(
-        "/api/v1/engineering/route-card",
-        json={
-            "route_number": f"RCL-{suffix}",
-            "drawing_revision_id": revision_id,
-            "sales_order_id": sales_order_id,
-        },
-        headers={"Authorization": f"Bearer {token}"},
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RCL-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_list.pdf",
     )
     assert route.status_code == 201
     route_card_id = route.json()["id"]
@@ -360,6 +379,14 @@ def test_engineering_soft_delete_and_list_filters_pagination():
     )
     assert list_before.status_code == 200
     assert len(list_before.json()) <= 1
+
+    list_by_search = client.get(
+        "/api/v1/engineering/route-card",
+        params={"q": f"RCL-{suffix}", "skip": 0, "limit": 20},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert list_by_search.status_code == 200
+    assert any(item["route_number"] == f"RCL-{suffix}" for item in list_by_search.json())
 
     delete_route = client.delete(
         f"/api/v1/engineering/route-card/{route_card_id}",
@@ -405,14 +432,12 @@ def test_engineering_route_card_rejects_non_current_revision():
     )
     assert rev_b.status_code == 201
 
-    route = client.post(
-        "/api/v1/engineering/route-card",
-        json={
-            "route_number": f"RC-NC-{suffix}",
-            "drawing_revision_id": rev_a_id,
-            "sales_order_id": sales_order_id,
-        },
-        headers={"Authorization": f"Bearer {token}"},
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-NC-{suffix}",
+        drawing_revision_id=rev_a_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_non_current.pdf",
     )
     assert route.status_code == 400
 
@@ -438,14 +463,12 @@ def test_engineering_validate_route_card_for_production_rejects_draft():
     assert rev.status_code == 201
     revision_id = rev.json()["id"]
 
-    route = client.post(
-        "/api/v1/engineering/route-card",
-        json={
-            "route_number": f"RC-VP-{suffix}",
-            "drawing_revision_id": revision_id,
-            "sales_order_id": sales_order_id,
-        },
-        headers={"Authorization": f"Bearer {token}"},
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-VP-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_vp.pdf",
     )
     assert route.status_code == 201
     route_card_id = route.json()["id"]
@@ -481,14 +504,13 @@ def test_engineering_validate_route_card_for_production_accepts_released():
     assert rev.status_code == 201
     revision_id = rev.json()["id"]
 
-    route = client.post(
-        "/api/v1/engineering/route-card",
-        json={
-            "route_number": f"RC-VR-{suffix}",
-            "drawing_revision_id": revision_id,
-            "sales_order_id": sales_order_id,
-        },
-        headers={"Authorization": f"Bearer {token}"},
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-VR-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_vr.pdf",
+        content=b"Route card prod content",
     )
     assert route.status_code == 201
     route_card_id = route.json()["id"]
@@ -518,3 +540,82 @@ def test_engineering_validate_route_card_for_production_accepts_released():
         validate_route_card_for_production(route_card)
     finally:
         db.close()
+
+
+def test_engineering_route_card_document_upload_download_and_release_requirement():
+    token = _get_admin_token()
+    sales_order_id = _seed_sales_order()
+    suffix = random.randint(100000, 999999)
+
+    draw = client.post(
+        "/api/v1/engineering/drawing",
+        json={"drawing_number": f"DRW-DOC-{suffix}", "part_name": "DOC Part", "is_active": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert draw.status_code == 201
+    drawing_id = draw.json()["id"]
+
+    rev = client.post(
+        f"/api/v1/engineering/drawing/{drawing_id}/revision",
+        json={"revision_code": "A", "file_path": "/tmp/doc-a.pdf", "is_current": True},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert rev.status_code == 201
+    revision_id = rev.json()["id"]
+
+    create_without_file = client.post(
+        "/api/v1/engineering/route-card",
+        data={
+            "route_number": f"RC-DOC-MISSING-{suffix}",
+            "drawing_revision_id": str(revision_id),
+            "sales_order_id": str(sales_order_id),
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create_without_file.status_code == 422
+
+    route = _create_route_card_with_document(
+        token=token,
+        route_number=f"RC-DOC-{suffix}",
+        drawing_revision_id=revision_id,
+        sales_order_id=sales_order_id,
+        filename="route_card_doc.pdf",
+        content=b"Route card downloadable content",
+    )
+    assert route.status_code == 201
+    route_card_id = route.json()["id"]
+
+    op = client.post(
+        f"/api/v1/engineering/route-card/{route_card_id}/operation",
+        json={
+            "operation_number": 10,
+            "operation_name": "Milling",
+            "work_center": "WC-DOC",
+            "sequence_order": 1,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert op.status_code == 201
+
+    download = client.get(
+        f"/api/v1/engineering/route-card/{route_card_id}/document/download",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert download.status_code == 200
+    assert download.content == b"Route card downloadable content"
+    assert "application/pdf" in download.headers.get("content-type", "")
+
+    download_by_traceability = client.get(
+        "/api/v1/engineering/route-card/document/download",
+        params={"traceability": f"RC-DOC-{suffix}"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert download_by_traceability.status_code == 200
+    assert download_by_traceability.content == b"Route card downloadable content"
+    assert "application/pdf" in download_by_traceability.headers.get("content-type", "")
+
+    release_with_doc = client.post(
+        f"/api/v1/engineering/route-card/{route_card_id}/release",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert release_with_doc.status_code == 200

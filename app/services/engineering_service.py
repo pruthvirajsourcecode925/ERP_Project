@@ -219,6 +219,9 @@ def release_route_card(
     if route_card.status != RouteCardStatus.DRAFT:
         raise EngineeringBusinessRuleError("RouteCard can only be released from Draft status")
 
+    if not route_card.route_card_file_path:
+        raise EngineeringBusinessRuleError("RouteCard document must be uploaded before release")
+
     operations_exist = db.scalar(
         select(RouteOperation.id).where(RouteOperation.route_card_id == route_card_id)
     )

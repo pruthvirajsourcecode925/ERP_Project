@@ -240,7 +240,6 @@ def test_cannot_create_quotation_if_feasibility_checkbox_false():
             "valid_until": str(date.today()),
             "currency": "INR",
             "subtotal": "100.00",
-            "tax_amount": "18.00",
             "total_amount": "118.00",
             "status": "draft",
         },
@@ -252,6 +251,32 @@ def test_cannot_create_quotation_if_feasibility_checkbox_false():
     assert "quotation cannot be generated due to incomplete contract review" in detail.lower()
     assert "the following feasibility items are not approved" in detail.lower()
     assert "• Drawing availability" in detail
+
+
+def test_create_quotation_rejects_tax_amount_input_field():
+    token = _get_token_for_role("Sales")
+
+    response = client.post(
+        "/api/v1/sales/quotation",
+        json={
+            "quotation_number": f"QTNX{random.randint(10000, 99999)}",
+            "enquiry_id": 1,
+            "contract_review_id": 1,
+            "customer_id": 1,
+            "issue_date": str(date.today()),
+            "valid_until": str(date.today()),
+            "currency": "INR",
+            "subtotal": "100.00",
+            "tax_amount": "18.00",
+            "total_amount": "118.00",
+            "status": "draft",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any(item.get("type") == "extra_forbidden" and item.get("loc") == ["body", "tax_amount"] for item in detail)
 
 
 def test_cannot_create_sales_order_without_approved_contract_review():

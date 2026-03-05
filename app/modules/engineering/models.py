@@ -112,6 +112,10 @@ class RouteCard(Base, EngineeringAuditMixin):
     )
     released_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     released_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    route_card_file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    route_card_file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    route_card_file_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    route_card_file_content_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

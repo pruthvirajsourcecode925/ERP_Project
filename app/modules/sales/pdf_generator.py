@@ -227,7 +227,6 @@ def generate_quotation_pdf(data: QuotationPDFData) -> dict[str, str]:
         [
             ["Delivery Terms", data.delivery_terms],
             ["Payment Terms", data.payment_terms],
-            ["GST", data.gst_details],
             ["Validity", data.validity],
         ],
         colWidths=[40 * mm, 149 * mm],
