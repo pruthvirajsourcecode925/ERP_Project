@@ -1,0 +1,177 @@
+{
+  "info": {
+    "name": "AS9100D Users & Roles Admin",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Admin flow for RBAC and user management APIs."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "role_id", "value": "" },
+    { "key": "user_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "List Roles",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles?skip=0&limit=100",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles"],
+          "query": [
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "100" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Role",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('role_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"PostmanRole\",\n  \"description\": \"Role created from Postman collection\",\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles"]
+        }
+      }
+    },
+    {
+      "name": "Update Role Modules",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modules\": [\"sales\", \"purchase\", \"engineering\", \"stores\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/roles/{{role_id}}/modules",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "roles", "{{role_id}}", "modules"]
+        }
+      }
+    },
+    {
+      "name": "Create User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('user_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"postman_user_01\",\n  \"email\": \"postman.user.01@example.com\",\n  \"password\": \"Admin@12345\",\n  \"role_id\": {{role_id}},\n  \"auth_provider\": \"both\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users"]
+        }
+      }
+    },
+    {
+      "name": "List Users",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users?username=postman&skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users"],
+          "query": [
+            { "key": "username", "value": "postman" },
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Disable User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/disable",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "{{user_id}}", "disable"]
+        }
+      }
+    },
+    {
+      "name": "Enable User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/enable",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "{{user_id}}", "enable"]
+        }
+      }
+    },
+    {
+      "name": "Soft Delete User",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/soft-delete",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "users", "{{user_id}}", "soft-delete"]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,217 @@
+{
+  "info": {
+    "name": "AS9100D Engineering Route Card Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Engineering flow: drawing, revision, route card create with mandatory file upload, operation, release, and document download by id/traceability."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "sales_order_id", "value": "1" },
+    { "key": "drawing_id", "value": "" },
+    { "key": "drawing_revision_id", "value": "" },
+    { "key": "route_card_id", "value": "" },
+    { "key": "route_number", "value": "RC-POSTMAN-001" }
+  ],
+  "item": [
+    {
+      "name": "Create Drawing",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('drawing_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"drawing_number\": \"DRW-POSTMAN-001\",\n  \"part_name\": \"Postman Part\",\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/drawing",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "drawing"]
+        }
+      }
+    },
+    {
+      "name": "Create Drawing Revision (Current)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('drawing_revision_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"revision_code\": \"A\",\n  \"file_path\": \"/tmp/postman-rev-a.pdf\",\n  \"is_current\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/drawing/{{drawing_id}}/revision",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "drawing", "{{drawing_id}}", "revision"]
+        }
+      }
+    },
+    {
+      "name": "Create Route Card (mandatory multipart document)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('route_card_id', data.id);",
+              "pm.environment.set('route_number', data.route_number);",
+              "pm.test('File metadata present', function () {",
+              "  pm.expect(data.route_card_file_name).to.not.be.null;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "route_number", "value": "{{route_number}}", "type": "text" },
+            { "key": "drawing_revision_id", "value": "{{drawing_revision_id}}", "type": "text" },
+            { "key": "sales_order_id", "value": "{{sales_order_id}}", "type": "text" },
+            { "key": "file", "type": "file", "src": "" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card"]
+        }
+      }
+    },
+    {
+      "name": "List Route Cards (search + pagination)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card?q={{route_number}}&status=draft&skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card"],
+          "query": [
+            { "key": "q", "value": "{{route_number}}" },
+            { "key": "status", "value": "draft" },
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create Route Operation",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"operation_number\": 10,\n  \"operation_name\": \"Cutting\",\n  \"work_center\": \"WC-1\",\n  \"inspection_required\": false,\n  \"sequence_order\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card/{{route_card_id}}/operation",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card", "{{route_card_id}}", "operation"]
+        }
+      }
+    },
+    {
+      "name": "Download Route Card Document (by id)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card/{{route_card_id}}/document/download",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card", "{{route_card_id}}", "document", "download"]
+        }
+      }
+    },
+    {
+      "name": "Download Route Card Document (by traceability)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card/document/download?traceability={{route_number}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card", "document", "download"],
+          "query": [
+            { "key": "traceability", "value": "{{route_number}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Release Route Card",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/engineering/route-card/{{route_card_id}}/release",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "engineering", "route-card", "{{route_card_id}}", "release"]
+        }
+      }
+    }
+  ]
+}
