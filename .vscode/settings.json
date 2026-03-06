@@ -1,8 +1,0 @@
-{
-    "python.testing.cwd": "as9100d-erp-backend",
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
-    "python.testing.pytestEnabled": true,
-    "python.testing.unittestEnabled": false
-}
