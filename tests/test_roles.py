@@ -232,3 +232,60 @@ def test_module_access_enforced_for_custom_role():
         headers={"Authorization": f"Bearer {custom_token}"},
     )
     assert allowed_resp.status_code == 200
+
+
+def test_admin_can_grant_stores_module_access_to_non_stores_role():
+    admin_token = get_admin_token()
+    role_name = f"CrossStores{random.randint(1000, 9999)}"
+
+    create_role_resp = client.post(
+        "/api/v1/roles/",
+        json={"name": role_name},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_role_resp.status_code == 201
+    role_id = create_role_resp.json()["id"]
+
+    db = SessionLocal()
+    try:
+        custom_role = db.scalar(select(Role).where(Role.id == role_id))
+        assert custom_role is not None
+        uid = random.randint(10000, 99999)
+        username = f"{role_name.lower()}{uid}"
+        user = User(
+            username=username,
+            email=f"{username}@example.com",
+            password_hash=get_password_hash("Password@123"),
+            role_id=custom_role.id,
+            auth_provider="local",
+            is_active=True,
+            is_locked=False,
+            failed_attempts=0,
+            is_deleted=False,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        custom_token = create_access_token(str(user.id))
+    finally:
+        db.close()
+
+    denied_resp = client.get(
+        "/api/v1/stores/location",
+        headers={"Authorization": f"Bearer {custom_token}"},
+    )
+    assert denied_resp.status_code == 403
+
+    assign_resp = client.put(
+        f"/api/v1/roles/{role_id}/modules",
+        json={"modules": ["purchase", "stores"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert assign_resp.status_code == 200
+    assert assign_resp.json()["modules"] == ["purchase", "stores"]
+
+    allowed_resp = client.get(
+        "/api/v1/stores/location",
+        headers={"Authorization": f"Bearer {custom_token}"},
+    )
+    assert allowed_resp.status_code == 200

@@ -14,6 +14,7 @@ DEFAULT_ROLES = [
     "Engineering",
     "Sales",
     "Purchase",
+    "Stores",
     "Quality",
     "Production",
     "Maintenance",
@@ -48,6 +49,9 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
     if not user:
         return None
     if not user.is_active or user.is_locked:
+        return None
+    role = db.scalar(select(Role).where(Role.id == user.role_id))
+    if not role or not role.is_active:
         return None
     if user.auth_provider == "google":
         return None

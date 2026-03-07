@@ -37,22 +37,48 @@ def get_admin_token() -> str:
     return create_access_token(str(admin_id))
 
 
+def create_user_as_admin(*, username: str, email: str, password: str, role: str, auth_provider: str = "local") -> dict:
+    response = client.post(
+        "/api/v1/users/",
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "role": role,
+            "auth_provider": auth_provider,
+        },
+        headers={"Authorization": f"Bearer {get_admin_token()}"},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def test_create_user():
     """Test creating a new user with role name."""
     uid = random.randint(10000, 99999)
-    user_data = {
-        "username": f"testuser{uid}",
-        "email": f"test{uid}@example.com",
-        "password": "Password123",
-        "role": "Sales",
-        "auth_provider": "local",
-    }
-    response = client.post("/api/v1/users/", json=user_data)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["username"] == user_data["username"]
-    assert data["email"] == user_data["email"]
+    data = create_user_as_admin(
+        username=f"testuser{uid}",
+        email=f"test{uid}@example.com",
+        password="Password123",
+        role="Sales",
+    )
+    assert data["username"] == f"testuser{uid}"
+    assert data["email"] == f"test{uid}@example.com"
     assert "id" in data
+
+
+def test_anonymous_user_creation_is_blocked():
+    uid = random.randint(10000, 99999)
+    response = client.post(
+        "/api/v1/users/",
+        json={
+            "username": f"anonuser{uid}",
+            "email": f"anonuser{uid}@example.com",
+            "password": "Password123",
+            "role": "Sales",
+        },
+    )
+    assert response.status_code == 401
 
 
 def test_get_user():
@@ -83,17 +109,12 @@ def test_update_user():
 def test_update_user_password():
     """Test updating password actually updates login credentials."""
     uid = random.randint(10000, 99999)
-    create_resp = client.post(
-        "/api/v1/users/",
-        json={
-            "username": f"pwduser{uid}",
-            "email": f"pwduser{uid}@example.com",
-            "password": "Old@12345",
-            "role": "Sales",
-        },
-    )
-    assert create_resp.status_code == 200
-    user_id = create_resp.json()["id"]
+    user_id = create_user_as_admin(
+        username=f"pwduser{uid}",
+        email=f"pwduser{uid}@example.com",
+        password="Old@12345",
+        role="Sales",
+    )["id"]
 
     token = get_admin_token()
     update_resp = client.put(
@@ -134,16 +155,12 @@ def test_delete_user():
     token = get_admin_token()
     # First create a user to delete
     uid = random.randint(10000, 99999)
-    create_resp = client.post(
-        "/api/v1/users/",
-        json={
-            "username": f"deluser{uid}",
-            "email": f"deluser{uid}@example.com",
-            "password": "Password123",
-            "role": "Sales",
-        },
-    )
-    user_id = create_resp.json()["id"]
+    user_id = create_user_as_admin(
+        username=f"deluser{uid}",
+        email=f"deluser{uid}@example.com",
+        password="Password123",
+        role="Sales",
+    )["id"]
 
     # Delete it
     response = client.delete(
@@ -183,6 +200,7 @@ def test_non_admin_cannot_create_admin_user():
             "password": password,
             "role": "Sales",
         },
+        headers={"Authorization": f"Bearer {get_admin_token()}"},
     )
     assert create_sales_resp.status_code == 200
 
@@ -238,6 +256,7 @@ def test_list_users_with_filters():
             "role": "Sales",
             "auth_provider": "local",
         },
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert create_resp.status_code == 200
 
@@ -264,6 +283,7 @@ def test_unlock_disable_enable_user():
             "password": "Password123",
             "role": "Sales",
         },
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert create_resp.status_code == 200
     user_id = create_resp.json()["id"]
@@ -296,3 +316,118 @@ def test_unlock_disable_enable_user():
     )
     assert enable_resp.status_code == 200
     assert enable_resp.json()["is_active"] is True
+
+
+@pytest.mark.slow
+def test_non_admin_cannot_self_promote_or_update_other_users():
+    uid = random.randint(10000, 99999)
+    user_one = create_user_as_admin(
+        username=f"selfrole{uid}",
+        email=f"selfrole{uid}@example.com",
+        password="Password123",
+        role="Sales",
+    )
+    user_two = create_user_as_admin(
+        username=f"otherrole{uid}",
+        email=f"otherrole{uid}@example.com",
+        password="Password123",
+        role="Sales",
+    )
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": user_one["username"], "password": "Password123"},
+    )
+    assert login_resp.status_code == 200
+    user_token = login_resp.json()["access_token"]
+
+    db = SessionLocal()
+    try:
+        admin_role = db.scalar(select(Role).where(Role.name == "Admin"))
+        assert admin_role is not None
+        promote_resp = client.put(
+            f"/api/v1/users/{user_one['id']}",
+            json={"role_id": admin_role.id},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert promote_resp.status_code == 403
+
+        other_read_resp = client.get(
+            f"/api/v1/users/{user_two['id']}",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert other_read_resp.status_code == 403
+
+        other_update_resp = client.put(
+            f"/api/v1/users/{user_two['id']}",
+            json={"email": f"changed{uid}@example.com"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert other_update_resp.status_code == 403
+
+        admin_only_resp = client.get(
+            "/api/v1/roles/",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert admin_only_resp.status_code == 403
+    finally:
+        db.close()
+
+
+@pytest.mark.slow
+def test_deactivated_role_loses_access():
+    admin_token = get_admin_token()
+    role_name = f"DeactivatedRole{random.randint(1000, 9999)}"
+
+    create_role_resp = client.post(
+        "/api/v1/roles/",
+        json={"name": role_name},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_role_resp.status_code == 201
+    role_id = create_role_resp.json()["id"]
+
+    assign_resp = client.put(
+        f"/api/v1/roles/{role_id}/modules",
+        json={"modules": ["sales"]},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert assign_resp.status_code == 200
+
+    uid = random.randint(10000, 99999)
+    create_user_resp = client.post(
+        "/api/v1/users/",
+        json={
+            "username": f"deactuser{uid}",
+            "email": f"deactuser{uid}@example.com",
+            "password": "Password123",
+            "role_id": role_id,
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_user_resp.status_code == 200
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={"username": f"deactuser{uid}", "password": "Password123"},
+    )
+    assert login_resp.status_code == 200
+    user_token = login_resp.json()["access_token"]
+
+    before_resp = client.get(
+        "/api/v1/sales/quotation-terms",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert before_resp.status_code == 200
+
+    deactivate_resp = client.delete(
+        f"/api/v1/roles/{role_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert deactivate_resp.status_code == 204
+
+    after_resp = client.get(
+        "/api/v1/sales/quotation-terms",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert after_resp.status_code == 401

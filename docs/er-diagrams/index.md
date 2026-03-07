@@ -5,6 +5,7 @@ All module ER diagrams are centralized under this folder.
 ## Module ERDs
 - Auth & RBAC: [auth-rbac-erd.md](auth-rbac-erd.md)
 - Engineering: [engineering-erd.md](engineering-erd.md)
+- Production: [production-erd.md](production-erd.md)
 - Sales: [sales-erd.md](sales-erd.md)
 - Purchase: [purchase-erd.md](purchase-erd.md)
 - Stores: [stores-erd.md](stores-erd.md)

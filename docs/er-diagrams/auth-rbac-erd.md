@@ -1,6 +1,6 @@
-# Auth & RBAC ER Diagram
+# Auth and RBAC ER Diagram
 
-[← Back to ERD Index](index.md)
+[Back to ERD Index](index.md)
 
 ```mermaid
 erDiagram
@@ -15,6 +15,8 @@ erDiagram
         varchar name UK
         varchar description
         boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     role_module_access {
@@ -34,6 +36,8 @@ erDiagram
         boolean is_active
         boolean is_locked
         int failed_attempts
+        timestamptz created_at
+        timestamptz updated_at
         int created_by FK "nullable self"
         int updated_by FK "nullable self"
         boolean is_deleted
@@ -69,8 +73,12 @@ erDiagram
 ```
 
 ## Notes
-- `oauth_states` is standalone state-tracking for OAuth flow (no FK to users).
-- `role_module_access` enables multi-module permissions per role.
+- `oauth_states` is standalone state-tracking for OAuth flow and does not reference `users`.
+- `role_module_access` enables admin-approved multi-module access per role.
+- Current valid module keys include `auth`, `users`, `roles`, `sales`, `purchase`, `stores`, `engineering`, `quality`, `production`, `maintenance`, and `dispatch`.
+- Default business-role mappings include `Sales`, `Purchase`, `Stores`, `Engineering`, and `Production`.
+- Inactive roles block authentication and protected API access even if the user record itself is active.
+- User creation and role/module management are admin-governed operations; there is no public registration route in the current backend.
 
 ## Navigation
 - Previous: [Purchase ERD](purchase-erd.md)

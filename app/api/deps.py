@@ -46,6 +46,10 @@ def get_current_user(
     user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
     if not user or not user.is_active or user.is_locked:
         raise credentials_exc
+
+    role = db.scalar(select(Role).where(Role.id == user.role_id))
+    if not role or not role.is_active:
+        raise credentials_exc
     return user
 
 
@@ -72,6 +76,10 @@ def get_optional_current_user(
     user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
     if not user or not user.is_active or user.is_locked:
         raise credentials_exc
+
+    role = db.scalar(select(Role).where(Role.id == user.role_id))
+    if not role or not role.is_active:
+        raise credentials_exc
     return user
 
 
@@ -87,7 +95,7 @@ def require_roles(*allowed_roles: str, module: str | None = None):
         db: Session = Depends(get_db),
     ) -> User:
         role = db.scalar(select(Role).where(Role.id == current_user.role_id))
-        if not role:
+        if not role or not role.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
 
         if role.name == "Admin":

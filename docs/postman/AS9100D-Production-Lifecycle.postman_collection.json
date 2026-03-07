@@ -1,0 +1,47 @@
+{
+  "info": {
+    "name": "AS9100D Production Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Production flow: production log, reporting, traceability, and related endpoints."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "production_log_id", "value": "" },
+    { "key": "batch_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Create Production Log",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"batch_id\": \"BATCH-POSTMAN-001\",\n  \"quantity\": 100,\n  \"status\": \"Started\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/logs",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "logs"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('production_log_id', data.id);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

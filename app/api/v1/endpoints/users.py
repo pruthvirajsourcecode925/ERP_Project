@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_active_user, get_current_active_admin, get_optional_current_user
+from app.api.deps import get_current_active_user, get_current_active_admin
 from app.core.security import get_password_hash
 from app.db.session import get_db
 from app.models.role import Role
@@ -13,11 +13,17 @@ from app.services.auth_service import create_user as create_user_service, add_au
 
 router = APIRouter()
 
+
+def _is_admin(db: Session, user: User) -> bool:
+    role = db.scalar(select(Role).where(Role.id == user.role_id))
+    return bool(role and role.name == "Admin" and role.is_active)
+
+
 @router.post("/", response_model=UserResponse)
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_active_admin),
 ):
     existing_email = db.query(User).filter(User.email == user.email).first()
     if existing_email:
@@ -43,13 +49,8 @@ def create_user(
         raise HTTPException(status_code=400, detail=f"Role id '{role_id}' not found")
 
     target_role_name = requested_role_name or role_exists.name
-    if target_role_name == "Admin":
-        if not current_user:
-            raise HTTPException(status_code=403, detail="Admin access required to create an admin user")
-
-        current_user_role = db.scalar(select(Role).where(Role.id == current_user.role_id))
-        if not current_user_role or current_user_role.name != "Admin":
-            raise HTTPException(status_code=403, detail="Admin access required to create an admin user")
+    if target_role_name == "Admin" and not _is_admin(db, current_user):
+        raise HTTPException(status_code=403, detail="Admin access required to create an admin user")
 
     new_user = create_user_service(
         db=db,
@@ -64,18 +65,33 @@ def create_user(
 
 @router.get("/{user_id}", response_model=UserResponse)
 def read_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+    if not _is_admin(db, current_user) and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="You can only view your own user record")
     return user
 
 @router.put("/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    db_user = db.query(User).filter(User.id == user_id).first()
+    db_user = db.scalar(select(User).where(User.id == user_id, User.is_deleted.is_(False)))
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    is_admin = _is_admin(db, current_user)
+    if not is_admin and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="You can only update your own user record")
+
     update_data = user.model_dump(exclude_unset=True)
+
+    if not is_admin:
+        restricted_fields = {"role_id", "is_active", "is_locked"}
+        attempted_restricted_fields = sorted(field for field in restricted_fields if field in update_data)
+        if attempted_restricted_fields:
+            raise HTTPException(
+                status_code=403,
+                detail="Only admin can update role, active, or lock state",
+            )
 
     if "email" in update_data and update_data["email"] != db_user.email:
         email_exists = db.query(User).filter(User.email == update_data["email"], User.id != user_id).first()
@@ -99,6 +115,7 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db), c
 
     for key, value in update_data.items():
         setattr(db_user, key, value)
+    db_user.updated_by = current_user.id
     db.commit()
     db.refresh(db_user)
     return db_user

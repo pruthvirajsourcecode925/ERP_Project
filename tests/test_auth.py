@@ -1,10 +1,37 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.security import create_access_token, create_password_reset_token
+from app.core.security import create_access_token, create_password_reset_token, get_password_hash
+from app.db.session import SessionLocal
+from app.models.role import Role
+from app.models.user import User
+from sqlalchemy import select
 from uuid import uuid4
 
 client = TestClient(app)
+
+
+def get_admin_token() -> str:
+    db = SessionLocal()
+    admin_id = None
+    try:
+        admin = db.scalar(select(User).where(User.username == "admin"))
+        admin_role = db.scalar(select(Role).where(Role.name == "Admin"))
+        if admin and admin_role:
+            admin.password_hash = get_password_hash("Admin@12345")
+            admin.role_id = admin_role.id
+            admin.is_active = True
+            admin.is_locked = False
+            admin.failed_attempts = 0
+            admin.auth_provider = "both"
+            db.add(admin)
+            db.commit()
+            admin_id = admin.id
+    finally:
+        db.close()
+
+    assert admin_id is not None
+    return create_access_token(str(admin_id))
 
 
 def create_test_user() -> tuple[str, str]:
@@ -20,6 +47,7 @@ def create_test_user() -> tuple[str, str]:
             "password": password,
             "role": "Sales",
         },
+        headers={"Authorization": f"Bearer {get_admin_token()}"},
     )
     assert resp.status_code == 200
     return username, password
@@ -94,6 +122,7 @@ def test_change_password():
             "password": "Old@12345",
             "role": "Sales",
         },
+        headers={"Authorization": f"Bearer {get_admin_token()}"},
     )
     assert create_resp.status_code == 200
 
@@ -139,6 +168,7 @@ def test_forgot_password_and_reset():
             "password": "Old@12345",
             "role": "Sales",
         },
+        headers={"Authorization": f"Bearer {get_admin_token()}"},
     )
     assert create_resp.status_code == 200
     user_id = create_resp.json()["id"]

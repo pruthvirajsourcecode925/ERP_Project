@@ -20,6 +20,7 @@ Primary ER diagrams are maintained in this backend repository:
 - Purchase ERD: [docs/er-diagrams/purchase-erd.md](docs/er-diagrams/purchase-erd.md)
 - Stores ERD: [docs/er-diagrams/stores-erd.md](docs/er-diagrams/stores-erd.md)
 - Engineering ERD: [docs/er-diagrams/engineering-erd.md](docs/er-diagrams/engineering-erd.md)
+- Production ERD: [docs/er-diagrams/production-erd.md](docs/er-diagrams/production-erd.md)
 - Auth & RBAC ERD: [docs/er-diagrams/auth-rbac-erd.md](docs/er-diagrams/auth-rbac-erd.md)
 
 Rule: whenever schema changes are made in any module, update the corresponding ERD file before push.
