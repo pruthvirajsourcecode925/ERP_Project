@@ -15,15 +15,15 @@ erDiagram
         varchar name UK
         varchar description
         boolean is_active
-        timestamptz created_at
-        timestamptz updated_at
+        datetime created_at
+        datetime updated_at
     }
 
     role_module_access {
         int id PK
         int role_id FK
         varchar module_key
-        timestamptz created_at
+        datetime created_at
     }
 
     users {
@@ -32,12 +32,12 @@ erDiagram
         varchar email UK
         varchar password_hash
         int role_id FK
-        enum auth_provider "local|google|both"
+        string auth_provider "local|google|both"
         boolean is_active
         boolean is_locked
         int failed_attempts
-        timestamptz created_at
-        timestamptz updated_at
+        datetime created_at
+        datetime updated_at
         int created_by FK "nullable self"
         int updated_by FK "nullable self"
         boolean is_deleted
@@ -47,8 +47,8 @@ erDiagram
         int id PK
         int user_id FK
         varchar token_hash UK
-        timestamptz expires_at
-        timestamptz revoked_at "nullable"
+        datetime expires_at
+        datetime revoked_at "nullable"
         varchar revoked_reason "nullable"
     }
 
@@ -56,8 +56,8 @@ erDiagram
         int id PK
         varchar provider
         varchar state UK
-        timestamptz expires_at
-        timestamptz consumed_at "nullable"
+        datetime expires_at
+        datetime consumed_at "nullable"
     }
 
     audit_logs {
@@ -66,9 +66,9 @@ erDiagram
         varchar action
         varchar table_name "nullable"
         int record_id "nullable"
-        jsonb old_value "nullable"
-        jsonb new_value "nullable"
-        timestamptz timestamp
+        text old_value "nullable"
+        text new_value "nullable"
+        datetime timestamp
     }
 ```
 
