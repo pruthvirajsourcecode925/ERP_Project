@@ -80,7 +80,7 @@ erDiagram
     packing_lists {
         bigint id PK
         varchar packing_list_number UK
-        bigint dispatch_order_id FK UK
+        bigint dispatch_order_id FK "unique"
         date packed_date
         int package_count
         numeric gross_weight "nullable"
@@ -97,7 +97,7 @@ erDiagram
     dispatch_invoices {
         bigint id PK
         varchar invoice_number UK
-        bigint dispatch_order_id FK UK
+        bigint dispatch_order_id FK "unique"
         date invoice_date
         varchar currency
         numeric subtotal
@@ -115,7 +115,7 @@ erDiagram
     delivery_challans {
         bigint id PK
         varchar challan_number UK
-        bigint dispatch_order_id FK UK
+        bigint dispatch_order_id FK "unique"
         date issue_date
         varchar received_by "nullable"
         timestamptz acknowledged_at "nullable"

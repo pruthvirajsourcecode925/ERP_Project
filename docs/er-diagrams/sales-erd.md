@@ -58,7 +58,7 @@ erDiagram
         int revision
         timestamptz generated_at
         bigint generated_by FK "nullable"
-        bigint enquiry_id FK UK
+        bigint enquiry_id FK "unique"
         enum status "pending|approved|rejected"
         bool scope_clarity_ok
         bool capability_ok
