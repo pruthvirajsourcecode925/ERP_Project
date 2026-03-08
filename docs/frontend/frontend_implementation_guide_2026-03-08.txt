@@ -1,0 +1,917 @@
+AS9100D ERP FRONTEND IMPLEMENTATION GUIDE
+Date: 2026-03-08
+
+====================================================================
+1. PURPOSE
+====================================================================
+
+This document explains the backend structure of the ERP project from a
+frontend development point of view.
+
+It is meant to help frontend implementation by answering these questions:
+
+1. What is the overall project structure?
+2. How do the business modules connect to each other?
+3. What screens should the frontend contain?
+4. What workflows should the frontend respect?
+5. What shared UI patterns should be implemented early?
+6. In what order should the frontend be built?
+
+
+====================================================================
+2. PROJECT OVERVIEW
+====================================================================
+
+This ERP backend is built with FastAPI and follows a manufacturing workflow
+aligned with AS9100D-style business processes.
+
+The main business chain is:
+
+1. Sales creates demand.
+2. Engineering defines product and process instructions.
+3. Purchase procures required material.
+4. Stores receives and verifies material.
+5. Production executes manufacturing.
+6. Quality verifies conformance and traceability.
+7. Dispatch releases finished goods and documents.
+8. Maintenance supports machines and can block production.
+9. Admin provides system-wide visibility, search, audit, and analytics.
+
+This means the frontend should not be designed as isolated CRUD modules.
+It should be designed as connected workflow domains.
+
+
+====================================================================
+3. BACKEND HIGH-LEVEL STRUCTURE
+====================================================================
+
+Important backend areas:
+
+1. app/main.py
+   - FastAPI application entry point.
+   - Handles startup tasks.
+
+2. app/api/v1/api.py
+   - Main router registration point.
+   - Connects all modules under /api/v1.
+
+3. app/api/deps.py
+   - Authentication and authorization helpers.
+   - Role checks and module access enforcement.
+
+4. app/api/v1/endpoints/
+   - Shared endpoint files for older modules.
+   - Includes auth, users, roles, sales, engineering, purchase, stores,
+     production, maintenance.
+
+5. app/modules/
+   - Business module directory.
+   - Newer modules are more self-contained.
+
+Current module folders:
+
+1. admin
+2. dispatch
+3. engineering
+4. maintenance
+5. production
+6. purchase
+7. quality
+8. sales
+9. stores
+
+
+====================================================================
+4. API WIRING MODEL
+====================================================================
+
+The API is mounted under /api/v1.
+
+Main route groups:
+
+1. /api/v1/auth
+2. /api/v1/users
+3. /api/v1/roles
+4. sales routes
+5. engineering routes
+6. purchase routes
+7. stores routes
+8. production routes
+9. dispatch routes
+10. admin search routes
+11. admin audit routes
+12. admin dashboard routes
+13. admin analytics routes
+14. admin alerts routes
+15. production report routes
+16. quality routes
+17. maintenance routes
+
+Frontend implication:
+
+You should group your frontend API layer by module, not by low-level file.
+
+
+====================================================================
+5. AUTHENTICATION AND ACCESS CONTROL
+====================================================================
+
+Authentication model:
+
+1. Bearer access token for protected requests.
+2. Refresh-token-based session continuation.
+3. Admin-controlled users and roles.
+4. Module access can be explicitly assigned to roles.
+
+Important authorization behavior:
+
+1. Admin can access all protected areas.
+2. Non-admin roles may be allowed by role name.
+3. If module access entries exist for a role, access is enforced by module key.
+4. Locked, inactive, deleted users are blocked.
+5. Users linked to inactive roles are blocked.
+
+Frontend requirements:
+
+1. Use one centralized auth provider.
+2. Add bearer token automatically to protected API requests.
+3. Handle 401 by refreshing or redirecting to login.
+4. Handle 403 by hiding or blocking inaccessible pages.
+5. Build menu visibility from role and module access.
+
+
+====================================================================
+6. BACKEND MODULE FILE PATTERN
+====================================================================
+
+Newer modules follow a clean domain pattern:
+
+1. models.py
+   - Database entities.
+
+2. schemas.py
+   - Request and response payloads.
+
+3. services.py
+   - Business rules.
+
+4. routers.py
+   - API endpoints.
+
+5. reports.py or traceability.py
+   - PDF/report logic or domain helper logic.
+
+Frontend mirror pattern should be:
+
+1. api/
+   - Endpoint call wrappers.
+
+2. types/
+   - DTO types and UI types.
+
+3. features/
+   - Screen and domain logic grouped by module.
+
+4. components/
+   - Reusable UI blocks.
+
+5. guards/
+   - Route protection and permission checks.
+
+
+====================================================================
+7. RECOMMENDED FRONTEND ARCHITECTURE
+====================================================================
+
+Recommended frontend structure:
+
+src/
+  app/
+    router/
+    providers/
+    layout/
+  api/
+    client.ts
+    auth.ts
+    users.ts
+    roles.ts
+    sales.ts
+    engineering.ts
+    purchase.ts
+    stores.ts
+    production.ts
+    quality.ts
+    maintenance.ts
+    dispatch.ts
+    admin.ts
+  features/
+    auth/
+    dashboard/
+    users/
+    roles/
+    sales/
+    engineering/
+    purchase/
+    stores/
+    production/
+    quality/
+    maintenance/
+    dispatch/
+    admin/
+  components/
+    forms/
+    tables/
+    charts/
+    badges/
+    workflow/
+    documents/
+    timeline/
+    feedback/
+  guards/
+  hooks/
+  types/
+  utils/
+  styles/
+
+This structure is appropriate whether you use React, Next.js, or another
+component-based frontend framework.
+
+
+====================================================================
+8. RECOMMENDED FRONTEND SITEMAP
+====================================================================
+
+Public/auth routes:
+
+1. /login
+2. /forgot-password
+3. /reset-password
+
+Protected routes:
+
+1. /dashboard
+2. /users
+3. /roles
+4. /sales/customers
+5. /sales/enquiries
+6. /sales/contract-reviews
+7. /sales/quotations
+8. /sales/customer-po-reviews
+9. /sales/orders
+10. /engineering/drawings
+11. /engineering/route-cards
+12. /purchase/suppliers
+13. /purchase/orders
+14. /stores/locations
+15. /stores/grn
+16. /stores/inventory
+17. /stores/issues
+18. /production/orders
+19. /production/operations
+20. /production/rework
+21. /production/reports
+22. /quality/incoming-inspections
+23. /quality/inprocess-inspections
+24. /quality/final-inspections
+25. /quality/fai
+26. /quality/ncr
+27. /quality/capa
+28. /quality/root-cause
+29. /quality/gauges
+30. /quality/audits
+31. /quality/mrm
+32. /quality/traceability
+33. /maintenance/machines
+34. /maintenance/preventive-plans
+35. /maintenance/breakdowns
+36. /maintenance/work-orders
+37. /maintenance/downtime
+38. /dispatch/orders
+39. /admin/search
+40. /admin/audit-logs
+41. /admin/analytics
+42. /admin/alerts
+
+
+====================================================================
+9. APP NAVIGATION MODEL
+====================================================================
+
+Recommended left navigation:
+
+1. Dashboard
+2. Sales
+3. Engineering
+4. Purchase
+5. Stores
+6. Production
+7. Quality
+8. Maintenance
+9. Dispatch
+10. Admin
+11. Settings
+
+Recommended top bar:
+
+1. global search for admin users
+2. alerts icon
+3. current user profile
+4. logout
+
+Navigation rule:
+
+The menu should be role-aware and module-aware. Do not show screens the user
+cannot use.
+
+
+====================================================================
+10. SHARED UI COMPONENTS TO BUILD EARLY
+====================================================================
+
+These components should be created first because almost every module will use
+them:
+
+1. AppShell
+2. PermissionGuard
+3. StatusBadge
+4. DataTable
+5. DetailHeader
+6. WorkflowStepper
+7. ActionPanel
+8. ConfirmDialog
+9. DocumentDownloadButton
+10. TimelinePanel
+11. AuditInfo
+12. EmptyState
+13. ErrorState
+14. LoadingState
+
+
+====================================================================
+11. OVERALL BUSINESS DEPENDENCY MAP
+====================================================================
+
+This is the most important dependency map for frontend planning:
+
+1. Dispatch depends on Quality and Production.
+2. Production depends on Engineering and Stores.
+3. Stores depends on Purchase.
+4. Purchase and Engineering depend on Sales.
+5. Maintenance can block Production.
+6. Admin reads across all modules.
+
+Frontend implementation should follow the same direction.
+
+
+====================================================================
+12. OVERALL BUSINESS FLOW
+====================================================================
+
+End-to-end business chain:
+
+1. Customer
+2. Enquiry
+3. Contract Review
+4. Quotation
+5. Customer PO Review
+6. Sales Order
+7. Drawing Revision
+8. Route Card
+9. Purchase Order
+10. GRN
+11. MTC Verification
+12. RMIR Inspection
+13. Inventory Batch
+14. Production Order
+15. Production Operation Execution
+16. In-Process Inspection
+17. Production Log
+18. Final Inspection / FAI / NCR / CAPA
+19. Certificate of Conformance
+20. Dispatch Order
+21. Packing List / Invoice / Delivery Challan
+22. Shipment Release
+
+UI implication:
+
+Your screens should be able to link related records across modules.
+
+
+====================================================================
+13. MODULE-BY-MODULE DETAILED FRONTEND GUIDE
+====================================================================
+
+--------------------------------------------------------------------
+13.1 AUTH
+--------------------------------------------------------------------
+
+Purpose:
+User authentication and session management.
+
+Backend capabilities:
+
+1. login
+2. refresh rotation
+3. logout
+4. password change
+5. forgot password
+6. reset password
+7. Google OAuth callback
+
+Frontend screens:
+
+1. Login page
+2. Forgot password page
+3. Reset password page
+
+Frontend behavior:
+
+1. Centralize token storage.
+2. Use route guards.
+3. Redirect by role/module after login.
+4. Handle expired session gracefully.
+
+
+--------------------------------------------------------------------
+13.2 USERS AND ROLES
+--------------------------------------------------------------------
+
+Purpose:
+Administrative user and role management.
+
+Frontend screens:
+
+1. User list
+2. Create user
+3. Edit user
+4. Role list
+5. Role detail
+6. Role-module access matrix
+
+Important UX needs:
+
+1. Admin-only visibility.
+2. Clear state badges for active, locked, deleted.
+3. Matrix UI for module assignments.
+
+
+--------------------------------------------------------------------
+13.3 SALES
+--------------------------------------------------------------------
+
+Purpose:
+Demand creation and sales document flow.
+
+Core entities:
+
+1. Customer
+2. Enquiry
+3. Contract Review
+4. Quotation
+5. Customer PO Review
+6. Sales Order
+
+Recommended screens:
+
+1. Customer list and detail
+2. Enquiry list and detail
+3. Contract review detail
+4. Quotation list and detail
+5. Customer PO review detail
+6. Sales order list and detail
+
+Recommended UI pattern:
+
+Use a stepper or timeline:
+
+Enquiry -> Contract Review -> Quotation -> PO Review -> Sales Order
+
+Frontend detail page tabs:
+
+1. Summary
+2. Related documents
+3. History
+4. Downstream links
+
+
+--------------------------------------------------------------------
+13.4 ENGINEERING
+--------------------------------------------------------------------
+
+Purpose:
+Product definition and route definition.
+
+Core entities:
+
+1. Drawing
+2. Drawing Revision
+3. Route Card
+4. Route Operations
+
+Recommended screens:
+
+1. Drawing list
+2. Drawing detail
+3. Revision history
+4. Route card list
+5. Route card detail
+6. Route card operation editor
+7. Route release screen
+
+Recommended UI pattern:
+
+1. Revision timeline
+2. Operation sequence editor
+3. Release status badge
+
+Important frontend rule:
+
+Production depends on released route cards, so release state must be visible.
+
+
+--------------------------------------------------------------------
+13.5 PURCHASE
+--------------------------------------------------------------------
+
+Purpose:
+Supplier management and procurement flow.
+
+Core entities:
+
+1. Supplier
+2. Purchase Order
+3. Purchase Order Items
+
+Recommended screens:
+
+1. Supplier list
+2. Supplier approval detail
+3. Purchase order list
+4. Purchase order detail
+5. Purchase order item editor
+
+Important UX needs:
+
+1. Supplier approval should be separate from PO entry.
+2. PO detail should show quality requirements.
+3. PO should link to GRN and downstream stores activity.
+
+
+--------------------------------------------------------------------
+13.6 STORES
+--------------------------------------------------------------------
+
+Purpose:
+Material receiving, verification, storage, and inventory traceability.
+
+Core entities:
+
+1. Storage Location
+2. GRN
+3. GRN Item
+4. MTC Verification
+5. RMIR Inspection
+6. Batch Inventory
+7. Material Issue / Stock movements
+
+Recommended screens:
+
+1. Storage location master
+2. GRN list
+3. GRN detail
+4. GRN receiving screen
+5. MTC verification screen
+6. RMIR inspection screen
+7. Inventory list
+8. Batch detail page
+9. Issue material screen
+
+Important UX needs:
+
+1. Batch number visibility on all relevant screens.
+2. GRN detail should look like a workflow document.
+3. Inventory should be batch-centric, not only item-centric.
+
+
+--------------------------------------------------------------------
+13.7 PRODUCTION
+--------------------------------------------------------------------
+
+Purpose:
+Execution of manufacturing operations.
+
+Core entities:
+
+1. Production Order
+2. Production Operation
+3. Production Log
+4. In-Process Inspection
+5. Rework Order
+6. Production Reports
+
+Critical business rules affecting frontend:
+
+1. Route card must be released.
+2. Operation start is sequence-controlled.
+3. Inactive machine blocks operation start.
+4. Maintenance status UnderMaintenance blocks operation start.
+5. Operation completion needs passed in-process inspection.
+6. Failed inspection can create rework.
+
+Recommended screens:
+
+1. Production order list
+2. Production order detail
+3. Operation execution page
+4. Operator assignment page
+5. Inspection entry page
+6. Production log page
+7. Rework list and detail
+8. Production reports page
+
+Best UI pattern:
+
+Production order detail with tabs:
+
+1. Overview
+2. Operations
+3. Logs
+4. Inspections
+5. Rework
+6. Reports
+
+Show blockers explicitly on the page.
+
+
+--------------------------------------------------------------------
+13.8 QUALITY
+--------------------------------------------------------------------
+
+Purpose:
+Quality control, evidence, nonconformance, and traceability.
+
+Core entities:
+
+1. Incoming Inspection
+2. In-Process Inspection
+3. Final Inspection
+4. FAI
+5. NCR
+6. Root Cause Analysis
+7. CAPA
+8. Gauge
+9. Audit Plan / Audit Report
+10. Management Review Meeting
+11. Traceability views
+12. PDF reports
+
+Recommended screens:
+
+1. Incoming inspection queue
+2. In-process inspection queue
+3. Final inspection queue
+4. FAI list and detail
+5. NCR list and detail
+6. CAPA list and detail
+7. Root cause detail
+8. Gauge register
+9. Audit screens
+10. Management review screens
+11. Traceability explorer
+
+Best UI pattern:
+
+1. Queue-based home page
+2. Related-record linking
+3. Traceability explorer by batch, NCR, and customer
+4. PDF download buttons on detail pages
+
+Important UX needs:
+
+Quality is not just data entry. It is review, closure, and evidence.
+
+
+--------------------------------------------------------------------
+13.9 MAINTENANCE
+--------------------------------------------------------------------
+
+Purpose:
+Machine lifecycle, preventive maintenance, breakdowns, work orders,
+downtime, and traceability.
+
+Core entities:
+
+1. Maintenance Machine
+2. Preventive Plan
+3. Breakdown Report
+4. Work Order
+5. Downtime
+6. Machine History
+
+Recommended screens:
+
+1. Machine list
+2. Machine detail
+3. Preventive plan list
+4. Breakdown list and detail
+5. Work order list and detail
+6. Downtime list
+7. Machine history timeline
+
+Best UI pattern:
+
+Machine detail tabs:
+
+1. Overview
+2. PM Plans
+3. Breakdowns
+4. Work Orders
+5. Downtime
+6. History
+
+Important frontend rule:
+
+Machine state should also be surfaced inside Production UI.
+
+
+--------------------------------------------------------------------
+13.10 DISPATCH
+--------------------------------------------------------------------
+
+Purpose:
+Shipment preparation, release, and customer shipping documents.
+
+Core entities:
+
+1. Dispatch Order
+2. Dispatch Item
+3. Dispatch Checklist
+4. Packing List
+5. Invoice
+6. Delivery Challan
+7. Shipment Tracking
+
+Critical business rules affecting frontend:
+
+Release should be blocked unless:
+
+1. dispatch items exist
+2. checklist is approved
+3. CoC is linked
+4. final inspection passed
+5. packing list exists
+6. invoice exists
+7. delivery challan exists
+
+Recommended screens:
+
+1. Dispatch order list
+2. Dispatch order detail
+3. Dispatch item editor
+4. Checklist page
+5. Document action panel
+6. Shipment release page
+
+Best UI pattern:
+
+Dispatch detail should show readiness cards:
+
+1. Items ready
+2. Checklist ready
+3. CoC linked
+4. Final inspection pass confirmed
+5. Packing list generated
+6. Invoice generated
+7. Delivery challan generated
+
+Do not hide blockers only in error toasts. Show them on screen.
+
+
+--------------------------------------------------------------------
+13.11 ADMIN
+--------------------------------------------------------------------
+
+Purpose:
+System-wide visibility and governance.
+
+Core features:
+
+1. Global Search
+2. Audit Logs
+3. Dashboard Summary
+4. Analytics
+5. Alerts
+6. Alert settings
+
+Recommended screens:
+
+1. Search page
+2. Audit log explorer
+3. Summary dashboard
+4. Analytics dashboard
+5. Alerts and settings panel
+
+Best UI pattern:
+
+1. Cards
+2. Charts
+3. Drill-down links to source modules
+4. Filtered audit table
+
+
+====================================================================
+14. SHARED FRONTEND DATA HANDLING RULES
+====================================================================
+
+Implement one shared API client with:
+
+1. bearer token injection
+2. refresh handling
+3. common error translation
+4. consistent data fetching and mutation patterns
+
+Recommended response handling:
+
+1. 400 -> business rule error shown as user-facing validation message
+2. 401 -> refresh or redirect to login
+3. 403 -> show access denied and hide action buttons
+4. 404 -> show not found state
+5. 422 -> field-level validation mapping
+
+
+====================================================================
+15. RECOMMENDED IMPLEMENTATION ORDER
+====================================================================
+
+Build the frontend in this order:
+
+1. Auth
+2. App shell
+3. Permission system
+4. Dashboard shell
+5. Sales
+6. Engineering
+7. Purchase
+8. Stores
+9. Production
+10. Quality
+11. Maintenance
+12. Dispatch
+13. Admin deep analytics and audit
+
+Reason:
+
+This order matches the dependency chain of the backend.
+
+
+====================================================================
+16. FIRST FRONTEND MILESTONE
+====================================================================
+
+Best first milestone:
+
+1. Login
+2. Protected layout
+3. Role-aware sidebar navigation
+4. Dashboard
+5. Sales list/detail screens
+6. Engineering route card screens
+
+That will give a stable base before entering operational modules.
+
+
+====================================================================
+17. WHAT THE FRONTEND MUST RESPECT
+====================================================================
+
+1. Status-driven workflows matter more than plain CRUD.
+2. Many modules depend on prior module completion.
+3. Several screens need document behavior and PDF download support.
+4. Traceability and related-record linking are essential.
+5. Machine maintenance state affects production state.
+6. Dispatch readiness depends on multiple upstream validations.
+
+
+====================================================================
+18. FINAL DEVELOPMENT ADVICE
+====================================================================
+
+If you want the frontend to fit this backend cleanly:
+
+1. Build by workflow, not just by table.
+2. Reuse shared page patterns.
+3. Show blockers explicitly.
+4. Make related records clickable across modules.
+5. Keep permissions centralized.
+6. Treat PDFs and reports as first-class features.
+
+Most important summary:
+
+Dispatch depends on Quality and Production.
+Production depends on Engineering and Stores.
+Stores depends on Purchase.
+Purchase and Engineering depend on Sales.
+Maintenance can block Production.
+Admin reads everything.
+
+If the frontend respects this chain, it will match the backend correctly.

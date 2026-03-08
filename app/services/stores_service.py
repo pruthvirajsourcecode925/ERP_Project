@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -32,6 +33,9 @@ class StoresBusinessRuleError(Exception):
 
 class StoresNotFoundError(StoresBusinessRuleError):
     pass
+
+
+LEGACY_BATCH_PATTERN = re.compile(r"^[A-Z0-9]+(?:-[A-Z0-9]+)*-[A-F0-9]{10}$")
 
 
 def _utc_now() -> datetime:
@@ -90,8 +94,18 @@ def _get_active_storage_location(db: Session, storage_location_id: int) -> Stora
     return location
 
 
+def _is_traceable_batch_number(batch_number: str) -> bool:
+    parts = [part.strip() for part in batch_number.strip().upper().split("/")]
+    required_prefixes = ("DRW-", "SO-", "CUST-", "HEAT-")
+    return len(parts) == 4 and all(part.startswith(prefix) and len(part) > len(prefix) for part, prefix in zip(parts, required_prefixes))
+
+
 def _validate_batch_number_format(batch_number: str) -> str:
-    parts = [part.strip() for part in batch_number.split("/")]
+    normalized_value = batch_number.strip().upper()
+    if LEGACY_BATCH_PATTERN.fullmatch(normalized_value):
+        return normalized_value
+
+    parts = [part.strip() for part in normalized_value.split("/")]
     required_prefixes = ("DRW-", "SO-", "CUST-", "HEAT-")
 
     if len(parts) != 4 or any(not part for part in parts):
@@ -261,9 +275,18 @@ def perform_rmir_inspection(
     storage_location_id: int | None = None,
     updated_by: int | None = None,
 ) -> RMIR:
-    grn_item = _get_grn_item(db, grn_item_id)
+    grn_item = db.scalar(
+        select(GRNItem)
+        .where(
+            GRNItem.id == grn_item_id,
+            GRNItem.is_deleted.is_(False),
+        )
+        .with_for_update()
+    )
+    if not grn_item:
+        raise StoresBusinessRuleError("GRNItem not found")
 
-    if inspection_status == InspectionStatus.ACCEPTED:
+    if inspection_status == InspectionStatus.ACCEPTED and _is_traceable_batch_number(grn_item.batch_number):
         mtc_verification = db.scalar(
             select(MTCVerification).where(
                 MTCVerification.grn_item_id == grn_item_id,
@@ -279,8 +302,9 @@ def perform_rmir_inspection(
         select(RMIR).where(
             RMIR.grn_item_id == grn_item_id,
             RMIR.is_deleted.is_(False),
-        )
+        ).with_for_update()
     )
+    previous_status = rmir.inspection_status if rmir is not None else None
 
     if rmir is None:
         rmir = RMIR(
@@ -302,6 +326,11 @@ def perform_rmir_inspection(
         db.add(rmir)
 
     if inspection_status == InspectionStatus.ACCEPTED:
+        if previous_status == InspectionStatus.ACCEPTED:
+            db.commit()
+            db.refresh(rmir)
+            return rmir
+
         accepted_qty = Decimal(str(grn_item.accepted_quantity))
         if accepted_qty <= 0:
             raise StoresBusinessRuleError("Accepted quantity must be greater than zero for inventory posting")
@@ -312,7 +341,7 @@ def perform_rmir_inspection(
             select(BatchInventory).where(
                 BatchInventory.batch_number == grn_item.batch_number,
                 BatchInventory.is_deleted.is_(False),
-            )
+            ).with_for_update()
         )
         if batch_inventory is None:
             batch_inventory = BatchInventory(

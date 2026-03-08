@@ -812,8 +812,28 @@ def record_production_log(
     created_by: int | None = None,
     recorded_at: datetime | None = None,
 ) -> ProductionLog:
-    production_order = _get_production_order(db, production_order_id)
-    operation = _get_production_operation(db, operation_id)
+    production_order = db.scalar(
+        select(ProductionOrder)
+        .where(
+            ProductionOrder.id == production_order_id,
+            ProductionOrder.is_deleted.is_(False),
+        )
+        .with_for_update()
+    )
+    if not production_order:
+        raise ProductionBusinessRuleError("ProductionOrder not found")
+
+    operation = db.scalar(
+        select(ProductionOperation)
+        .where(
+            ProductionOperation.id == operation_id,
+            ProductionOperation.is_deleted.is_(False),
+        )
+        .with_for_update()
+    )
+    if not operation:
+        raise ProductionBusinessRuleError("ProductionOperation not found")
+
     recording_user = _get_user(db, recorded_by)
 
     if operation.production_order_id != production_order.id:

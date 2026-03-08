@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
+from zipfile import ZipFile
 
 import pytest
 from sqlalchemy import select
@@ -18,8 +19,33 @@ from app.modules.dispatch.services import add_dispatch_item, create_dispatch_ord
 from app.modules.dispatch.services import generate_delivery_challan as create_delivery_challan_document
 from app.modules.dispatch.services import generate_invoice as create_invoice_document
 from app.modules.engineering.models import Drawing, DrawingRevision, RouteCard, RouteCardStatus
-from app.modules.production.models import ProductionOperation, ProductionOperationStatus, ProductionOrder, ProductionOrderStatus
-from app.modules.quality.models import CertificateOfConformance
+from app.modules.production.models import (
+    InProcessInspection,
+    InspectionResult,
+    ProductionLog,
+    ProductionOperation,
+    ProductionOperationStatus,
+    ProductionOrder,
+    ProductionOrderStatus,
+)
+from app.modules.purchase.models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, Supplier
+from app.modules.quality.models import (
+    AuditPlan,
+    AuditReport,
+    CAPA,
+    CAPAActionType,
+    CAPAStatus,
+    CertificateOfConformance,
+    FAIReport,
+    FAIReportStatus,
+    FinalInspection,
+    IncomingInspection,
+    IncomingInspectionStatus,
+    NCR,
+    NCRDefectCategory,
+    NCRStatus,
+    QualityInspectionResult,
+)
 from app.modules.quality import reports as quality_reports
 from app.modules.sales.models import (
     ContractReview,
@@ -34,10 +60,16 @@ from app.modules.sales.models import (
     SalesOrder,
     SalesOrderStatus,
 )
+from app.modules.stores.models import BatchInventory, GRN, GRNItem, GRNStatus, MTCVerification, StorageLocation
 
 
 def _unique(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex[:10].upper()}"
+
+
+def _traceable_batch_number() -> str:
+    token = uuid4().hex.upper()
+    return f"DRW-{token[:4]} / SO-{token[4:6]}-{token[6:9]} / CUST-{token[9:12]} / HEAT-{token[12:14]}"
 
 
 def _safe_filename_fragment(value: str) -> str:
@@ -252,9 +284,250 @@ def _seed_dispatch_context(db) -> dict[str, object]:
     db.refresh(sales_order)
     return {
         "admin_id": admin.id,
+        "operation_id": operation.id,
         "sales_order": sales_order,
         "production_order": production_order,
         "customer_name": sales_order.customer.name,
+    }
+
+
+def _seed_quality_report_context(db) -> dict[str, object]:
+    seeded = _seed_dispatch_context(db)
+    admin_id = seeded["admin_id"]
+    sales_order = seeded["sales_order"]
+    production_order = seeded["production_order"]
+    operation_id = seeded["operation_id"]
+    batch_number = _traceable_batch_number()
+
+    supplier = Supplier(
+        supplier_code=_unique("SUP"),
+        supplier_name="Quality Report Supplier",
+        contact_person="QA Contact",
+        phone="9999999999",
+        email=f"supplier.{uuid4().hex[:8]}@example.com",
+        address="Industrial Estate",
+        is_approved=True,
+        quality_acknowledged=True,
+        is_active=True,
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(supplier)
+    db.flush()
+
+    purchase_order = PurchaseOrder(
+        po_number=_unique("PO"),
+        supplier_id=supplier.id,
+        sales_order_id=sales_order.id,
+        po_date=date.today(),
+        expected_delivery_date=date.today(),
+        status=PurchaseOrderStatus.ISSUED,
+        total_amount=Decimal("50.00"),
+        quality_notes="Traceability material",
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(purchase_order)
+    db.flush()
+
+    purchase_order_item = PurchaseOrderItem(
+        purchase_order_id=purchase_order.id,
+        description="Quality report raw material",
+        quantity=Decimal("25.000"),
+        unit_price=Decimal("2.00"),
+        line_total=Decimal("50.00"),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(purchase_order_item)
+
+    location = StorageLocation(
+        location_code=_unique("LOC"),
+        location_name="Quality Report Stores",
+        description="Storage for quality report validation",
+        is_active=True,
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(location)
+    db.flush()
+
+    grn = GRN(
+        grn_number=_unique("GRN"),
+        purchase_order_id=purchase_order.id,
+        supplier_id=supplier.id,
+        received_by=admin_id,
+        received_datetime=datetime.now(timezone.utc),
+        grn_date=date.today(),
+        status=GRNStatus.ACCEPTED,
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(grn)
+    db.flush()
+
+    grn_item = GRNItem(
+        grn_id=grn.id,
+        item_code="RM-QA-001",
+        description="Quality report raw material",
+        heat_number="HEAT-QA-01",
+        batch_number=batch_number,
+        received_quantity=Decimal("25.000"),
+        accepted_quantity=Decimal("25.000"),
+        rejected_quantity=Decimal("0.000"),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(grn_item)
+    db.flush()
+
+    mtc = MTCVerification(
+        grn_item_id=grn_item.id,
+        mtc_number=_unique("MTC"),
+        chemical_composition_verified=True,
+        mechanical_properties_verified=True,
+        standard_compliance_verified=True,
+        verified_by=admin_id,
+        verification_date=date.today(),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(mtc)
+
+    batch_inventory = BatchInventory(
+        batch_number=batch_number,
+        storage_location_id=location.id,
+        item_code=grn_item.item_code,
+        current_quantity=Decimal("25.000"),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(batch_inventory)
+
+    incoming_inspection = IncomingInspection(
+        grn_id=grn.id,
+        grn_item_id=grn_item.id,
+        inspected_by=admin_id,
+        inspection_date=date.today(),
+        status=IncomingInspectionStatus.ACCEPTED,
+        remarks="Accepted into stores",
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(incoming_inspection)
+
+    inprocess_inspection = InProcessInspection(
+        production_operation_id=operation_id,
+        inspected_by=admin_id,
+        inspection_result=InspectionResult.PASS,
+        remarks="In-process inspection passed",
+        inspection_time=datetime.now(timezone.utc),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(inprocess_inspection)
+
+    production_log = ProductionLog(
+        production_order_id=production_order.id,
+        operation_id=operation_id,
+        batch_number=batch_number,
+        operator_user_id=admin_id,
+        produced_quantity=Decimal("25.000"),
+        scrap_quantity=Decimal("0.000"),
+        recorded_by=admin_id,
+        recorded_at=datetime.now(timezone.utc),
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(production_log)
+
+    final_inspection = db.scalar(
+        select(FinalInspection).where(FinalInspection.production_order_id == production_order.id)
+    )
+    if final_inspection is None:
+        final_inspection = FinalInspection(
+            production_order_id=production_order.id,
+            inspected_by=admin_id,
+            inspection_date=date.today(),
+            result=QualityInspectionResult.PASS,
+            remarks="Final inspection passed",
+            created_by=admin_id,
+            updated_by=admin_id,
+        )
+        db.add(final_inspection)
+        db.flush()
+    final_inspection.result = QualityInspectionResult.PASS
+    final_inspection.remarks = "Final inspection passed"
+    db.add(final_inspection)
+
+    fai = FAIReport(
+        production_order_id=production_order.id,
+        drawing_number=production_order.route_card.drawing_revision.drawing.drawing_number,
+        revision=production_order.route_card.drawing_revision.revision_code,
+        part_number=production_order.route_card.drawing_revision.drawing.part_name,
+        inspected_by=admin_id,
+        inspection_date=date.today(),
+        status=FAIReportStatus.APPROVED,
+        attachment_path="/tmp/fai-attachment.pdf",
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(fai)
+    db.flush()
+
+    ncr = NCR(
+        reference_type="FAIReport",
+        reference_id=fai.id,
+        reported_by=admin_id,
+        reported_date=datetime.now(timezone.utc),
+        defect_category=NCRDefectCategory.DOCUMENTATION,
+        description="Documentation discrepancy resolved through CAPA",
+        status=NCRStatus.CLOSED,
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(ncr)
+    db.flush()
+
+    capa = CAPA(
+        ncr_id=ncr.id,
+        action_type=CAPAActionType.CORRECTIVE,
+        responsible_person=admin_id,
+        target_date=date.today(),
+        status=CAPAStatus.CLOSED,
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(capa)
+
+    audit_plan = AuditPlan(
+        audit_area="Quality Assurance",
+        planned_date=date.today(),
+        auditor=admin_id,
+        status="Completed",
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(audit_plan)
+    db.flush()
+
+    audit_report = AuditReport(
+        audit_plan_id=audit_plan.id,
+        findings="Linked quality documents verified successfully",
+        status="Closed",
+        created_by=admin_id,
+        updated_by=admin_id,
+    )
+    db.add(audit_report)
+
+    db.commit()
+    return {
+        "inspection_id": final_inspection.id,
+        "fai_id": fai.id,
+        "ncr_id": ncr.id,
+        "capa_id": capa.id,
+        "audit_id": audit_report.id,
+        "batch_number": batch_number,
     }
 
 
@@ -363,6 +636,55 @@ def test_challan_pdf_document_validation():
         f"{_safe_filename_fragment(context['customer_name'])}.pdf"
     )
     _assert_pdf_file(file_path, expected_filename=expected_filename)
+
+
+def test_quality_reports_bundle_validation():
+    create_db_and_tables()
+
+    db = SessionLocal()
+    try:
+        context = _seed_quality_report_context(db)
+    finally:
+        db.close()
+
+    report_paths = {
+        "fir": quality_reports.generate_fir_report(context["inspection_id"]),
+        "fai": quality_reports.generate_fai_report(context["fai_id"]),
+        "ncr": quality_reports.generate_ncr_report(context["ncr_id"]),
+        "capa": quality_reports.generate_capa_report(context["capa_id"]),
+        "audit": quality_reports.generate_audit_report(context["audit_id"]),
+        "traceability": quality_reports.generate_traceability_report(context["batch_number"]),
+    }
+
+    for report_type, file_path in report_paths.items():
+        path = Path(file_path)
+        assert path.exists(), report_type
+        assert path.suffix.lower() == ".pdf"
+        assert path.stat().st_size > 0
+        assert path.read_bytes().startswith(b"%PDF")
+
+    bundle_path = quality_reports.generate_quality_reports_bundle(
+        inspection_id=context["inspection_id"],
+        fai_id=context["fai_id"],
+        ncr_id=context["ncr_id"],
+        capa_id=context["capa_id"],
+        audit_id=context["audit_id"],
+        batch_number=context["batch_number"],
+    )
+    bundle = Path(bundle_path)
+    assert bundle.exists()
+    assert bundle.suffix.lower() == ".zip"
+
+    with ZipFile(bundle) as archive:
+        names = archive.namelist()
+
+    assert len(names) == 6
+    assert any(name.startswith("FIR_") for name in names)
+    assert any(name.startswith("FAI_") for name in names)
+    assert any(name.startswith("NCR_") for name in names)
+    assert any(name.startswith("CAPA_") for name in names)
+    assert any(name.startswith("AUDIT_") for name in names)
+    assert any(name.startswith("TRACEABILITY_") for name in names)
 
 
 @pytest.mark.xfail(reason="COC PDF generator is not implemented in app.modules.quality.reports", strict=False)

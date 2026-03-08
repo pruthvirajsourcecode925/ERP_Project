@@ -16,6 +16,7 @@ from app.modules.sales.models import (
     SalesOrder,
     SalesOrderStatus,
 )
+from app.services.document_numbers import generate_sequential_document_number
 
 
 class SalesBusinessRuleError(Exception):
@@ -24,21 +25,12 @@ class SalesBusinessRuleError(Exception):
 
 def _generate_document_number(db: Session, prefix: str, model) -> str:
     year = datetime.now(ZoneInfo("UTC")).year
-    pattern = f"{prefix}-{year}-%"
-    latest = db.scalars(
-        select(model.document_number)
-        .where(model.document_number.like(pattern))
-        .order_by(model.document_number.desc())
-    ).first()
-
-    next_seq = 1
-    if latest:
-        try:
-            next_seq = int(latest.rsplit("-", 1)[1]) + 1
-        except (ValueError, IndexError):
-            next_seq = 1
-
-    return f"{prefix}-{year}-{next_seq:04d}"
+    return generate_sequential_document_number(
+        db,
+        field=model.document_number,
+        prefix=prefix,
+        year=year,
+    )
 
 
 def _ensure_all_feasibility_checks_true(contract_review: ContractReview) -> None:

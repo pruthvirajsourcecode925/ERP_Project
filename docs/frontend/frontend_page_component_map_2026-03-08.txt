@@ -1,0 +1,1032 @@
+AS9100D ERP FRONTEND PAGE AND COMPONENT MAP
+Date: 2026-03-08
+
+====================================================================
+1. PURPOSE
+====================================================================
+
+This document is the next planning step after the frontend implementation
+guide. It translates the backend structure into a concrete frontend page map
+and reusable component structure.
+
+Use this document to decide:
+
+1. What pages need to exist.
+2. What each page should contain.
+3. Which components should be shared.
+4. What should be built first in React or Next.js.
+5. How module pages should connect to each other.
+
+
+====================================================================
+2. TARGET FRONTEND MODEL
+====================================================================
+
+Recommended stack assumptions:
+
+1. React or Next.js frontend
+2. TypeScript
+3. API client wrapper around fetch or axios
+4. Role-aware routing
+5. Shared app shell
+6. Shared table, form, workflow, and document components
+
+This plan works for both:
+
+1. React Router app
+2. Next.js app router or pages router
+
+
+====================================================================
+3. TOP-LEVEL APP STRUCTURE
+====================================================================
+
+Recommended top-level structure:
+
+1. Public auth area
+2. Protected ERP shell
+3. Module-based pages
+4. Shared design system and workflow components
+
+Top-level areas:
+
+1. Auth
+2. Dashboard
+3. Admin configuration
+4. Core business modules
+5. Reports and downloads
+
+
+====================================================================
+4. RECOMMENDED FOLDER STRUCTURE
+====================================================================
+
+src/
+  app/
+    providers/
+    router/
+    layout/
+  api/
+    client.ts
+    auth.ts
+    users.ts
+    roles.ts
+    sales.ts
+    engineering.ts
+    purchase.ts
+    stores.ts
+    production.ts
+    quality.ts
+    maintenance.ts
+    dispatch.ts
+    admin.ts
+  features/
+    auth/
+    dashboard/
+    users/
+    roles/
+    sales/
+    engineering/
+    purchase/
+    stores/
+    production/
+    quality/
+    maintenance/
+    dispatch/
+    admin/
+  components/
+    shell/
+    forms/
+    tables/
+    workflow/
+    documents/
+    charts/
+    timeline/
+    badges/
+    feedback/
+  hooks/
+  guards/
+  types/
+  utils/
+  constants/
+
+
+====================================================================
+5. GLOBAL APP SHELL COMPONENTS
+====================================================================
+
+These components should exist before module work starts.
+
+5.1 AppShell
+Contains:
+1. Left sidebar
+2. Top bar
+3. Main content region
+4. Breadcrumb area
+5. Alerts area
+
+5.2 SidebarNavigation
+Contains:
+1. Dashboard link
+2. Module groups
+3. Permission-based visibility
+
+5.3 TopHeader
+Contains:
+1. Search entry for admin
+2. Notification or alerts icon
+3. Current user info
+4. Logout action
+
+5.4 Breadcrumbs
+Shows page hierarchy.
+
+5.5 PermissionGuard
+Blocks page rendering when role or module access is missing.
+
+5.6 PageContainer
+Provides standard spacing, title, actions, and tabs.
+
+
+====================================================================
+6. SHARED CORE COMPONENTS
+====================================================================
+
+Build these shared components once and reuse everywhere.
+
+6.1 StatusBadge
+Used for:
+1. order status
+2. inspection status
+3. approval state
+4. active or inactive state
+
+6.2 DataTable
+Used for list pages.
+Needs:
+1. sorting
+2. filtering
+3. pagination
+4. row actions
+5. loading state
+6. empty state
+
+6.3 DetailHeader
+Used on detail pages.
+Should show:
+1. title
+2. primary identifier
+3. status badge
+4. action buttons
+5. secondary metadata
+
+6.4 WorkflowStepper
+Used for document lifecycle modules such as sales and dispatch.
+
+6.5 ActionPanel
+Used on detail pages where workflow actions are important.
+
+6.6 EntitySummaryCard
+Shows key metadata in small blocks.
+
+6.7 TimelinePanel
+Shows chronological events, revisions, or history.
+
+6.8 AuditInfo
+Shows created at, updated at, created by, updated by.
+
+6.9 PdfDownloadButton
+Standardized document download action.
+
+6.10 RelatedRecordsPanel
+Shows cross-module links.
+
+6.11 ConfirmActionDialog
+Used for approve, release, complete, close, and ship actions.
+
+6.12 FormSection
+Reusable layout wrapper for grouped form fields.
+
+6.13 LoadingState
+6.14 EmptyState
+6.15 ErrorState
+
+
+====================================================================
+7. AUTH AREA PAGE MAP
+====================================================================
+
+Routes:
+
+1. /login
+2. /forgot-password
+3. /reset-password
+
+Pages:
+
+7.1 LoginPage
+Components:
+1. LoginForm
+2. PasswordField
+3. SubmitButton
+4. ForgotPasswordLink
+5. OAuthLoginSection
+
+Behavior:
+1. submit username and password
+2. store tokens
+3. redirect by role and module access
+
+7.2 ForgotPasswordPage
+Components:
+1. ForgotPasswordForm
+2. EmailField
+3. SubmitButton
+
+7.3 ResetPasswordPage
+Components:
+1. ResetPasswordForm
+2. PasswordField
+3. ConfirmPasswordField
+4. SubmitButton
+
+
+====================================================================
+8. DASHBOARD PAGE MAP
+====================================================================
+
+Route:
+1. /dashboard
+
+Page:
+
+8.1 DashboardHomePage
+Sections:
+1. SummaryCardsRow
+2. AlertsPanel
+3. QuickLinksPanel
+4. WorkQueuePanel
+5. ChartsArea
+
+Recommended cards:
+1. total customers
+2. total suppliers
+3. active production jobs
+4. pending dispatch
+5. open NCR
+6. open breakdowns
+
+Recommended components:
+1. SummaryCard
+2. AlertList
+3. MiniChartCard
+4. QuickActionTile
+
+
+====================================================================
+9. USERS AND ROLES PAGE MAP
+====================================================================
+
+Routes:
+1. /users
+2. /users/new
+3. /users/:id
+4. /roles
+5. /roles/:id
+
+9.1 UsersListPage
+Components:
+1. UsersTable
+2. UserFilters
+3. CreateUserButton
+
+UsersTable columns:
+1. username
+2. email
+3. role
+4. auth provider
+5. active state
+6. locked state
+7. actions
+
+9.2 UserCreatePage
+Components:
+1. UserForm
+2. RoleSelect
+3. AuthProviderSelect
+4. ActiveSwitch
+
+9.3 UserDetailPage
+Components:
+1. DetailHeader
+2. UserSummaryCard
+3. UserStatusPanel
+4. AuditInfo
+
+9.4 RolesListPage
+Components:
+1. RolesTable
+2. CreateRoleButton
+
+9.5 RoleDetailPage
+Components:
+1. RoleForm
+2. ModuleAccessMatrix
+3. SaveButton
+
+
+====================================================================
+10. SALES PAGE MAP
+====================================================================
+
+Routes:
+1. /sales/customers
+2. /sales/customers/:id
+3. /sales/enquiries
+4. /sales/enquiries/:id
+5. /sales/contract-reviews/:id
+6. /sales/quotations
+7. /sales/quotations/:id
+8. /sales/customer-po-reviews/:id
+9. /sales/orders
+10. /sales/orders/:id
+
+10.1 CustomersListPage
+Components:
+1. CustomersTable
+2. CustomerFilters
+3. CreateCustomerButton
+
+10.2 CustomerDetailPage
+Components:
+1. DetailHeader
+2. CustomerInfoCard
+3. RelatedSalesDocumentsPanel
+
+10.3 EnquiriesListPage
+Components:
+1. EnquiriesTable
+2. CreateEnquiryButton
+
+10.4 EnquiryDetailPage
+Components:
+1. WorkflowStepper
+2. EnquirySummaryCard
+3. RelatedRecordsPanel
+4. ActionPanel
+
+10.5 ContractReviewDetailPage
+Components:
+1. DetailHeader
+2. FeasibilityChecklistCard
+3. ReviewCommentsPanel
+4. ApprovalActionPanel
+
+10.6 QuotationsListPage
+Components:
+1. QuotationsTable
+2. StatusBadge
+3. DownloadQuoteAction
+
+10.7 QuotationDetailPage
+Components:
+1. DetailHeader
+2. QuotationSummaryCard
+3. QuotationItemsTable
+4. TermsPanel
+5. RelatedRecordsPanel
+
+10.8 CustomerPOReviewDetailPage
+Components:
+1. DetailHeader
+2. AcceptanceStatusCard
+3. DeviationNotesPanel
+
+10.9 SalesOrdersListPage
+Components:
+1. SalesOrdersTable
+2. SalesOrderFilters
+
+10.10 SalesOrderDetailPage
+Components:
+1. DetailHeader
+2. WorkflowStepper
+3. SummaryTab
+4. DocumentsTab
+5. DownstreamLinksTab
+
+
+====================================================================
+11. ENGINEERING PAGE MAP
+====================================================================
+
+Routes:
+1. /engineering/drawings
+2. /engineering/drawings/:id
+3. /engineering/route-cards
+4. /engineering/route-cards/:id
+
+11.1 DrawingsListPage
+Components:
+1. DrawingsTable
+2. CreateDrawingButton
+
+11.2 DrawingDetailPage
+Components:
+1. DetailHeader
+2. DrawingInfoCard
+3. RevisionHistoryTimeline
+4. AddRevisionAction
+
+11.3 RouteCardsListPage
+Components:
+1. RouteCardsTable
+2. RouteCardFilters
+
+11.4 RouteCardDetailPage
+Components:
+1. DetailHeader
+2. RouteCardSummaryCard
+3. RouteOperationsTable
+4. ReleaseActionPanel
+5. RelatedSalesOrderPanel
+
+11.5 RouteOperationEditorSection
+Components:
+1. RouteOperationForm
+2. OperationSequenceTable
+
+
+====================================================================
+12. PURCHASE PAGE MAP
+====================================================================
+
+Routes:
+1. /purchase/suppliers
+2. /purchase/suppliers/:id
+3. /purchase/orders
+4. /purchase/orders/:id
+
+12.1 SuppliersListPage
+Components:
+1. SuppliersTable
+2. SupplierFilters
+3. CreateSupplierButton
+
+12.2 SupplierDetailPage
+Components:
+1. DetailHeader
+2. SupplierInfoCard
+3. ApprovalStatusCard
+4. ApprovalActionPanel
+
+12.3 PurchaseOrdersListPage
+Components:
+1. PurchaseOrdersTable
+2. FiltersBar
+
+12.4 PurchaseOrderDetailPage
+Components:
+1. DetailHeader
+2. PurchaseOrderSummaryCard
+3. PurchaseOrderItemsTable
+4. QualityRequirementsPanel
+5. RelatedGRNPanel
+6. StatusActionPanel
+
+
+====================================================================
+13. STORES PAGE MAP
+====================================================================
+
+Routes:
+1. /stores/locations
+2. /stores/grn
+3. /stores/grn/:id
+4. /stores/inventory
+5. /stores/inventory/:batchId
+6. /stores/issues
+
+13.1 LocationsListPage
+Components:
+1. LocationsTable
+2. LocationForm
+
+13.2 GRNListPage
+Components:
+1. GRNTable
+2. CreateGRNButton
+
+13.3 GRNDetailPage
+Sections:
+1. Header
+2. GRNSummaryCard
+3. GRNItemsTable
+4. MTCSection
+5. RMIRSection
+6. InventoryOutcomeSection
+
+Components:
+1. GRNItemForm
+2. MTCVerificationForm
+3. RMIRInspectionForm
+4. StockPostingSummary
+
+13.4 InventoryListPage
+Components:
+1. BatchInventoryTable
+2. InventoryFilters
+
+Columns:
+1. batch number
+2. item code
+3. current quantity
+4. location
+5. links to traceability
+
+13.5 BatchDetailPage
+Components:
+1. DetailHeader
+2. BatchSummaryCard
+3. RelatedGRNPanel
+4. RelatedProductionUsagePanel
+5. TraceabilityLinkPanel
+
+13.6 MaterialIssuePage
+Components:
+1. IssueMaterialForm
+2. BatchSelector
+3. QuantityField
+
+
+====================================================================
+14. PRODUCTION PAGE MAP
+====================================================================
+
+Routes:
+1. /production/orders
+2. /production/orders/:id
+3. /production/operations/:id
+4. /production/rework
+5. /production/rework/:id
+6. /production/reports
+
+14.1 ProductionOrdersListPage
+Components:
+1. ProductionOrdersTable
+2. ProductionFilters
+
+14.2 ProductionOrderDetailPage
+Tabs:
+1. Overview
+2. Operations
+3. Logs
+4. Inspections
+5. Rework
+6. Reports
+
+Components:
+1. DetailHeader
+2. ProductionSummaryCard
+3. ProductionOperationsTable
+4. WorkflowBlockersPanel
+5. RelatedRecordsPanel
+
+14.3 OperationExecutionPage
+Components:
+1. OperationStatusCard
+2. MachineStatusCard
+3. StartOperationButton
+4. CompleteOperationButton
+5. AssignOperatorSection
+6. InspectionEntrySection
+7. ProductionLogEntrySection
+
+14.4 ReworkListPage
+Components:
+1. ReworkOrdersTable
+2. ReworkFilters
+
+14.5 ReworkDetailPage
+Components:
+1. DetailHeader
+2. ReworkSummaryCard
+3. ClosureActionPanel
+4. RelatedInspectionPanel
+
+14.6 ProductionReportsPage
+Components:
+1. ReportsFilterBar
+2. BatchReportTable
+3. OperatorReportTable
+4. MachineReportTable
+5. JobReportTable
+
+
+====================================================================
+15. QUALITY PAGE MAP
+====================================================================
+
+Routes:
+1. /quality/incoming-inspections
+2. /quality/inprocess-inspections
+3. /quality/final-inspections
+4. /quality/fai
+5. /quality/fai/:id
+6. /quality/ncr
+7. /quality/ncr/:id
+8. /quality/capa
+9. /quality/capa/:id
+10. /quality/root-cause
+11. /quality/gauges
+12. /quality/audits
+13. /quality/mrm
+14. /quality/traceability
+
+15.1 QualityHomePage
+Sections:
+1. Incoming queue
+2. Final inspection queue
+3. Open NCR count
+4. Open CAPA count
+5. Quick links
+
+15.2 IncomingInspectionsPage
+Components:
+1. IncomingInspectionsTable
+2. CompleteInspectionAction
+
+15.3 InProcessInspectionsPage
+Components:
+1. InProcessInspectionsTable
+2. InspectionResultBadge
+
+15.4 FinalInspectionsPage
+Components:
+1. FinalInspectionsTable
+2. CompleteInspectionAction
+3. ReportDownloadActions
+
+15.5 FAIListPage
+Components:
+1. FAITable
+2. CreateFAIButton
+
+15.6 FAIDetailPage
+Components:
+1. DetailHeader
+2. FAISummaryCard
+3. LinkedRecordsPanel
+4. PdfDownloadButton
+
+15.7 NCRListPage
+Components:
+1. NCRTable
+2. CreateNCRButton
+
+15.8 NCRDetailPage
+Components:
+1. DetailHeader
+2. NCRSummaryCard
+3. RootCausePanel
+4. CAPALinkPanel
+5. CloseNCRAction
+6. PdfDownloadButton
+
+15.9 CAPAListPage
+Components:
+1. CAPATable
+2. CAPAStatusBadge
+
+15.10 CAPADetailPage
+Components:
+1. DetailHeader
+2. CAPASummaryCard
+3. ResponsibilityPanel
+4. DueDatePanel
+5. PdfDownloadButton
+
+15.11 RootCausePage
+Components:
+1. RootCauseForm
+2. LinkedNCRPanel
+
+15.12 GaugesPage
+Components:
+1. GaugesTable
+2. GaugeForm
+
+15.13 AuditsPage
+Components:
+1. AuditPlansTable
+2. AuditReportsTable
+3. CreateAuditPlanForm
+4. CreateAuditReportForm
+5. PdfDownloadButton
+
+15.14 ManagementReviewMeetingsPage
+Components:
+1. MeetingsTable
+2. MeetingForm
+
+15.15 TraceabilityExplorerPage
+Sections:
+1. Search by batch number
+2. Search by NCR id
+3. Search by customer id
+4. Linked record view
+
+Components:
+1. TraceabilitySearchForm
+2. TraceabilitySummaryCard
+3. RelatedGRNPanel
+4. RelatedProductionPanel
+5. RelatedInspectionPanel
+6. RelatedDispatchPanel
+7. PdfDownloadButton
+
+
+====================================================================
+16. MAINTENANCE PAGE MAP
+====================================================================
+
+Routes:
+1. /maintenance/machines
+2. /maintenance/machines/:id
+3. /maintenance/preventive-plans
+4. /maintenance/breakdowns
+5. /maintenance/breakdowns/:id
+6. /maintenance/work-orders
+7. /maintenance/work-orders/:id
+8. /maintenance/downtime
+
+16.1 MachinesListPage
+Components:
+1. MachinesTable
+2. MachineStatusBadge
+3. CreateMachineButton
+
+16.2 MachineDetailPage
+Tabs:
+1. Overview
+2. Preventive plans
+3. Breakdowns
+4. Work orders
+5. Downtime
+6. History
+
+Components:
+1. DetailHeader
+2. MachineSummaryCard
+3. HistoryTimeline
+
+16.3 PreventivePlansPage
+Components:
+1. PreventivePlansTable
+2. PreventivePlanForm
+
+16.4 BreakdownsListPage
+Components:
+1. BreakdownsTable
+2. ReportBreakdownButton
+
+16.5 BreakdownDetailPage
+Components:
+1. DetailHeader
+2. BreakdownSummaryCard
+3. RelatedWorkOrderPanel
+4. MachineStatusImpactCard
+
+16.6 WorkOrdersListPage
+Components:
+1. WorkOrdersTable
+2. StatusFilter
+
+16.7 WorkOrderDetailPage
+Components:
+1. DetailHeader
+2. WorkOrderSummaryCard
+3. CompletionForm
+4. LinkedBreakdownPanel
+
+16.8 DowntimePage
+Components:
+1. DowntimeTable
+2. DowntimeFilters
+3. RecordDowntimeButton
+
+
+====================================================================
+17. DISPATCH PAGE MAP
+====================================================================
+
+Routes:
+1. /dispatch/orders
+2. /dispatch/orders/:id
+
+17.1 DispatchOrdersListPage
+Components:
+1. DispatchOrdersTable
+2. CreateDispatchOrderButton
+3. StatusFilter
+
+17.2 DispatchOrderDetailPage
+Main sections:
+1. Header
+2. Order summary
+3. Dispatch items
+4. Checklist
+5. Document actions
+6. Release readiness panel
+7. Shipment release action
+
+Components:
+1. DetailHeader
+2. DispatchSummaryCard
+3. DispatchItemsTable
+4. AddDispatchItemForm
+5. ChecklistTable
+6. ChecklistActionForm
+7. PackingListActionCard
+8. InvoiceActionCard
+9. ChallanActionCard
+10. ReleaseReadinessPanel
+11. ShipDispatchButton
+12. PdfDownloadButton
+
+Readiness panel items:
+1. has items
+2. checklist approved
+3. CoC linked
+4. final inspection passed
+5. packing list generated
+6. invoice generated
+7. delivery challan generated
+
+
+====================================================================
+18. ADMIN PAGE MAP
+====================================================================
+
+Routes:
+1. /admin/search
+2. /admin/audit-logs
+3. /admin/analytics
+4. /admin/alerts
+
+18.1 GlobalSearchPage
+Components:
+1. SearchInput
+2. SearchResultsTabs
+3. SearchResultsTable
+
+Result groups:
+1. customers
+2. suppliers
+3. sales orders
+4. production orders
+5. batches
+6. dispatch orders
+
+18.2 AuditLogsPage
+Components:
+1. AuditFiltersBar
+2. AuditLogsTable
+
+Filters:
+1. user id
+2. module
+3. start date
+4. end date
+5. limit
+
+18.3 AnalyticsPage
+Sections:
+1. Production trend
+2. Quality distribution
+3. Dispatch trend
+4. Supplier performance
+5. Machine utilization
+6. User performance
+
+Components:
+1. ChartCard
+2. TrendChart
+3. DistributionChart
+4. PerformanceTable
+
+18.4 AlertsPage
+Components:
+1. AlertsList
+2. AlertSettingsCard
+3. ToggleAlertsSwitch
+
+
+====================================================================
+19. CROSS-MODULE LINKING RULES
+====================================================================
+
+Every detail page should link to related downstream or upstream records.
+
+Important links:
+
+1. Customer -> Enquiries, Quotations, Sales Orders
+2. Sales Order -> Route Card, Purchase Order, Production Order, Dispatch Order
+3. GRN Batch -> Inventory -> Production Log -> Traceability
+4. Production Order -> Inspections, Rework, FAI, Dispatch
+5. NCR -> Root Cause -> CAPA
+6. Machine -> Breakdown -> Work Order -> Downtime
+7. Dispatch -> Invoice, Challan, Production Order, CoC
+
+Do not build detail pages as isolated screens.
+
+
+====================================================================
+20. SHARED STATE AND DATA FETCHING STRATEGY
+====================================================================
+
+Recommended shared logic:
+
+1. AuthProvider
+2. PermissionProvider
+3. useCurrentUser
+4. useModuleAccess
+5. usePaginatedTable
+6. useMutationFeedback
+7. useDocumentDownload
+
+Recommended cached domains:
+
+1. current user
+2. users and roles
+3. sales entities
+4. master data like suppliers, customers, machines, locations
+5. workflow detail pages
+
+
+====================================================================
+21. RECOMMENDED BUILD ORDER FOR PAGES
+====================================================================
+
+Phase 1:
+1. Login page
+2. App shell
+3. Route protection
+4. Sidebar and top header
+5. Dashboard
+
+Phase 2:
+1. Users and roles
+2. Sales list/detail pages
+3. Engineering list/detail pages
+
+Phase 3:
+1. Purchase pages
+2. Stores receiving and inventory pages
+
+Phase 4:
+1. Production pages
+2. Quality queue and detail pages
+
+Phase 5:
+1. Maintenance pages
+2. Dispatch pages
+3. Admin analytics and audit pages
+
+
+====================================================================
+22. FIRST REAL IMPLEMENTATION PACKAGE
+====================================================================
+
+If starting immediately, build this first package:
+
+1. AppShell
+2. LoginPage
+3. PermissionGuard
+4. DashboardHomePage
+5. CustomersListPage
+6. EnquiriesListPage
+7. SalesOrderDetailPage
+8. DrawingsListPage
+9. RouteCardDetailPage
+
+Reason:
+
+This gives a usable business skeleton without starting in the most complex
+operational modules.
+
+
+====================================================================
+23. FINAL SUMMARY
+====================================================================
+
+This page/component map is the frontend translation of the backend ERP design.
+
+Use it as the next planning layer after the implementation guide.
+
+Most important rule:
+
+Build by workflow and related records, not by isolated CRUD pages.
+
+If you respect this, the frontend will fit the backend correctly and will be
+much easier to scale as more modules are added.

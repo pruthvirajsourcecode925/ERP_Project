@@ -22,6 +22,7 @@ from app.modules.production.models import ProductionOrder
 from app.modules.quality.models import CertificateOfConformance
 from app.modules.quality.services import QualityBusinessRuleError, validate_final_inspection_required
 from app.modules.sales.models import SalesOrder
+from app.services.document_numbers import generate_sequential_document_number
 
 
 class DispatchBusinessRuleError(Exception):
@@ -40,22 +41,13 @@ def _to_decimal(value: Decimal | int | float | str) -> Decimal:
 
 def _generate_number(db: Session, *, prefix: str, model, field_name: str) -> str:
     year = _utc_now().year
-    pattern = f"{prefix}-{year}-%"
     field = getattr(model, field_name)
-    latest = db.scalars(
-        select(field)
-        .where(field.like(pattern))
-        .order_by(field.desc())
-    ).first()
-
-    next_seq = 1
-    if latest:
-        try:
-            next_seq = int(str(latest).rsplit("-", 1)[1]) + 1
-        except (ValueError, IndexError):
-            next_seq = 1
-
-    return f"{prefix}-{year}-{next_seq:04d}"
+    return generate_sequential_document_number(
+        db,
+        field=field,
+        prefix=prefix,
+        year=year,
+    )
 
 
 def _get_sales_order(db: Session, sales_order_id: int) -> SalesOrder:

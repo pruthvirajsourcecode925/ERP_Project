@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.modules.purchase.models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, Supplier
+from app.services.document_numbers import generate_sequential_document_number
 
 
 class PurchaseBusinessRuleError(Exception):
@@ -37,21 +38,12 @@ def _validate_po_dates(*, po_date: date, expected_delivery_date: date | None) ->
 
 def _generate_po_number(db: Session) -> str:
     year = datetime.now(ZoneInfo("UTC")).year
-    pattern = f"PO-{year}-%"
-    latest = db.scalars(
-        select(PurchaseOrder.po_number)
-        .where(PurchaseOrder.po_number.like(pattern))
-        .order_by(PurchaseOrder.po_number.desc())
-    ).first()
-
-    next_seq = 1
-    if latest:
-        try:
-            next_seq = int(latest.rsplit("-", 1)[1]) + 1
-        except (ValueError, IndexError):
-            next_seq = 1
-
-    return f"PO-{year}-{next_seq:04d}"
+    return generate_sequential_document_number(
+        db,
+        field=PurchaseOrder.po_number,
+        prefix="PO",
+        year=year,
+    )
 
 
 def _get_supplier(db: Session, supplier_id: int) -> Supplier:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -88,15 +88,37 @@ def create_dispatch_order_endpoint(
 
 @router.get("/order", response_model=list[DispatchOrderResponse])
 def list_dispatch_orders_endpoint(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Admin", "Dispatch", "Sales", "Quality", module="dispatch")),
 ):
     _ = current_user
-    return db.scalars(
-        select(DispatchOrder)
+    stmt = (
+        select(
+            DispatchOrder.id,
+            DispatchOrder.dispatch_number,
+            DispatchOrder.sales_order_id,
+            DispatchOrder.certificate_of_conformance_id,
+            DispatchOrder.dispatch_date,
+            DispatchOrder.status,
+            DispatchOrder.released_by,
+            DispatchOrder.released_at,
+            DispatchOrder.shipping_method,
+            DispatchOrder.destination,
+            DispatchOrder.remarks,
+            DispatchOrder.created_at,
+            DispatchOrder.updated_at,
+            DispatchOrder.created_by,
+            DispatchOrder.updated_by,
+            DispatchOrder.is_deleted,
+        )
         .where(DispatchOrder.is_deleted.is_(False))
         .order_by(DispatchOrder.id.desc())
-    ).all()
+        .offset(skip)
+        .limit(limit)
+    )
+    return [dict(row) for row in db.execute(stmt).mappings().all()]
 
 
 @router.post("/order/{id}/item", response_model=DispatchItemResponse, status_code=status.HTTP_201_CREATED)

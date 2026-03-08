@@ -50,6 +50,8 @@ def get_current_user(
     role = db.scalar(select(Role).where(Role.id == user.role_id))
     if not role or not role.is_active:
         raise credentials_exc
+    setattr(user, "_role_name", role.name)
+    setattr(user, "_role_is_active", role.is_active)
     return user
 
 
@@ -80,6 +82,8 @@ def get_optional_current_user(
     role = db.scalar(select(Role).where(Role.id == user.role_id))
     if not role or not role.is_active:
         raise credentials_exc
+    setattr(user, "_role_name", role.name)
+    setattr(user, "_role_is_active", role.is_active)
     return user
 
 
@@ -94,17 +98,28 @@ def require_roles(*allowed_roles: str, module: str | None = None):
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> User:
-        role = db.scalar(select(Role).where(Role.id == current_user.role_id))
-        if not role or not role.is_active:
+        role_name = getattr(current_user, "_role_name", None)
+        role_is_active = getattr(current_user, "_role_is_active", None)
+
+        if role_name is None or role_is_active is None:
+            role = db.scalar(select(Role).where(Role.id == current_user.role_id))
+            if not role or not role.is_active:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+            role_name = role.name
+            role_is_active = role.is_active
+            setattr(current_user, "_role_name", role_name)
+            setattr(current_user, "_role_is_active", role_is_active)
+
+        if not role_is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
 
-        if role.name == "Admin":
+        if role_name == "Admin":
             return current_user
 
-        role_allowed_by_name = role.name in allowed_roles
+        role_allowed_by_name = role_name in allowed_roles
         module_permissions = {
             access.module_key
-            for access in db.scalars(select(RoleModuleAccess).where(RoleModuleAccess.role_id == role.id)).all()
+            for access in db.scalars(select(RoleModuleAccess).where(RoleModuleAccess.role_id == current_user.role_id)).all()
         }
 
         if module_permissions:
@@ -113,7 +128,7 @@ def require_roles(*allowed_roles: str, module: str | None = None):
                 return current_user
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role.name}' does not have module access",
+                detail=f"Role '{role_name}' does not have module access",
             )
 
         if not role_allowed_by_name:

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.api.deps import get_db, require_roles
 from app.modules.production.models import (
     FAITriggerStatus,
     InspectionResult,
+    ProductionOrder,
     ProductionOperationStatus,
     ProductionOrderStatus,
     ReworkOrderStatus,
@@ -232,13 +234,28 @@ def list_production_orders_endpoint(
     db: Session = Depends(get_db),
     current_user=Depends(require_roles("Production", "Admin")),
 ):
-    return list_production_orders(
-        db,
-        q=q,
-        status_filter=status_filter,
-        skip=skip,
-        limit=limit,
-    )
+    _ = current_user
+    stmt = select(
+        ProductionOrder.id,
+        ProductionOrder.production_order_number,
+        ProductionOrder.sales_order_id,
+        ProductionOrder.route_card_id,
+        ProductionOrder.planned_quantity,
+        ProductionOrder.status,
+        ProductionOrder.start_date,
+        ProductionOrder.due_date,
+        ProductionOrder.created_at,
+        ProductionOrder.updated_at,
+    ).where(ProductionOrder.is_deleted.is_(False))
+
+    if q:
+        pattern = f"%{q.strip()}%"
+        stmt = stmt.where(ProductionOrder.production_order_number.ilike(pattern))
+    if status_filter is not None:
+        stmt = stmt.where(ProductionOrder.status == status_filter)
+
+    stmt = stmt.order_by(ProductionOrder.id.desc()).offset(skip).limit(limit)
+    return [dict(row) for row in db.execute(stmt).mappings().all()]
 
 
 @router.get("/order/{id}", response_model=ProductionOrderDetailOut)
