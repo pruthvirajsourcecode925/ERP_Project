@@ -18,3 +18,12 @@ from app.modules.purchase import (
 	PurchaseOrder,
 	PurchaseOrderItem,
 )
+from app.modules.dispatch import (
+	DispatchOrder,
+	DispatchItem,
+	DispatchChecklist,
+	PackingList,
+	Invoice,
+	DeliveryChallan,
+	ShipmentTracking,
+)

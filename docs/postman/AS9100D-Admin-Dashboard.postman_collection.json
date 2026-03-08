@@ -1,0 +1,151 @@
+{
+  "info": {
+    "name": "AS9100D Admin Dashboard",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Admin search, audit, dashboard summary, analytics, and alert endpoints for the AS9100D ERP backend."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "audit_user_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Global Search",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?q=test",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [{ "key": "q", "value": "test" }]
+        }
+      }
+    },
+    {
+      "name": "Audit Logs",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/audit-logs?limit=50&user_id={{audit_user_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "audit-logs"],
+          "query": [
+            { "key": "limit", "value": "50" },
+            { "key": "user_id", "value": "{{audit_user_id}}", "disabled": true }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Dashboard Summary",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/dashboard/summary",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "dashboard", "summary"]
+        }
+      }
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Production Trend",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/production-trend", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "production-trend"] }
+          }
+        },
+        {
+          "name": "Quality Distribution",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/quality-distribution", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "quality-distribution"] }
+          }
+        },
+        {
+          "name": "Dispatch Trend",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/dispatch-trend", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "dispatch-trend"] }
+          }
+        },
+        {
+          "name": "Supplier Performance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/supplier-performance", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "supplier-performance"] }
+          }
+        },
+        {
+          "name": "Machine Utilization",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/machine-utilization", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "machine-utilization"] }
+          }
+        },
+        {
+          "name": "User Performance",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/user-performance", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "user-performance"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "Get Alerts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/alerts", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "alerts"] }
+          }
+        },
+        {
+          "name": "Enable Alerts",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"alerts_enabled\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/alerts/settings", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "alerts", "settings"] }
+          }
+        },
+        {
+          "name": "Disable Alerts",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"alerts_enabled\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/api/v1/dashboard/alerts/settings", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dashboard", "alerts", "settings"] }
+          }
+        }
+      ]
+    }
+  ]
+}

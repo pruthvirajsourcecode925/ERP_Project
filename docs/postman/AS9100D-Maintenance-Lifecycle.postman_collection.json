@@ -1,0 +1,287 @@
+{
+	"info": {
+		"name": "AS9100D Maintenance Lifecycle",
+		"description": "End-to-end maintenance lifecycle: machine master, preventive maintenance plans, breakdown reporting, corrective work orders, downtime tracking, and machine history traceability.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8000"
+		},
+		{
+			"key": "access_token",
+			"value": ""
+		},
+		{
+			"key": "machine_id",
+			"value": ""
+		},
+		{
+			"key": "plan_id",
+			"value": ""
+		},
+		{
+			"key": "breakdown_id",
+			"value": ""
+		},
+		{
+			"key": "work_order_id",
+			"value": ""
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "1. Machine Master",
+			"item": [
+				{
+					"name": "Create Machine",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('machine_id', json.id);",
+									"    pm.test('Machine created', function() {",
+									"        pm.expect(json.machine_code).to.be.a('string');",
+									"        pm.expect(json.status).to.eql('Active');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"machine_code\": \"MAINT-CNC-001\",\n  \"machine_name\": \"CNC Vertical Machining Center\",\n  \"work_center\": \"WC-MACH-01\",\n  \"location\": \"Shop Floor - Bay 3\",\n  \"manufacturer\": \"DMG Mori\",\n  \"model\": \"CMX 600 V\",\n  \"serial_number\": \"SN-DMG-2024-001\",\n  \"commissioned_date\": \"2024-06-15\",\n  \"status\": \"Active\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/machine",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "machine"]
+						}
+					}
+				},
+				{
+					"name": "List Machines",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/machine",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "machine"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Preventive Maintenance",
+			"item": [
+				{
+					"name": "Create PM Plan",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('plan_id', json.id);",
+									"    pm.test('PM Plan created', function() {",
+									"        pm.expect(json.plan_code).to.be.a('string');",
+									"        pm.expect(json.is_active).to.be.true;",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"machine_id\": {{machine_id}},\n  \"plan_code\": \"PM-CNC-001-Q\",\n  \"frequency_type\": \"Quarterly\",\n  \"frequency_days\": 90,\n  \"checklist_template\": \"1. Spindle bearing check\\n2. Coolant system flush\\n3. Axis backlash measurement\\n4. Way cover inspection\",\n  \"standard_reference\": \"AS9100D Clause 8.5.1\",\n  \"next_due_date\": \"2026-06-15\",\n  \"is_active\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/preventive-plan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "preventive-plan"]
+						}
+					}
+				},
+				{
+					"name": "List PM Plans",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/preventive-plan",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "preventive-plan"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Breakdown Reporting",
+			"item": [
+				{
+					"name": "Report Breakdown (Critical)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('breakdown_id', json.id);",
+									"    pm.test('Breakdown reported', function() {",
+									"        pm.expect(json.severity).to.eql('Critical');",
+									"        pm.expect(json.status).to.eql('Open');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"machine_id\": {{machine_id}},\n  \"breakdown_number\": \"BD-2026-0001\",\n  \"reported_at\": \"2026-03-08T09:30:00Z\",\n  \"symptom_description\": \"Spindle vibration exceeding tolerance during high-speed operation. Audible bearing noise detected.\",\n  \"probable_cause\": \"Spindle bearing wear after extended high-speed cycles.\",\n  \"severity\": \"Critical\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/breakdown",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "breakdown"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Corrective Work Orders",
+			"item": [
+				{
+					"name": "Create Work Order",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('work_order_id', json.id);",
+									"    pm.test('Work order created', function() {",
+									"        pm.expect(json.status).to.eql('Created');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"work_order_number\": \"WO-2026-0001\",\n  \"breakdown_id\": {{breakdown_id}},\n  \"machine_id\": {{machine_id}},\n  \"planned_start_at\": \"2026-03-08T10:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/work-order",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "work-order"]
+						}
+					}
+				},
+				{
+					"name": "Complete Work Order",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"actual_start_at\": \"2026-03-08T10:15:00Z\",\n  \"actual_end_at\": \"2026-03-08T14:30:00Z\",\n  \"root_cause\": \"Spindle bearing failure due to accumulated wear from high-speed machining cycles.\",\n  \"repair_action\": \"Replaced spindle bearing assembly. Re-aligned spindle. Performed test cuts within tolerance.\",\n  \"breakdown_status\": \"Resolved\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/work-order/{{work_order_id}}/complete",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "work-order", "{{work_order_id}}", "complete"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Downtime Tracking",
+			"item": [
+				{
+					"name": "Record Downtime",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"machine_id\": {{machine_id}},\n  \"source_type\": \"Breakdown\",\n  \"source_id\": {{breakdown_id}},\n  \"downtime_start_at\": \"2026-03-08T09:30:00Z\",\n  \"downtime_end_at\": \"2026-03-08T14:30:00Z\",\n  \"duration_minutes\": 300,\n  \"is_planned\": false,\n  \"reason_code\": \"BEARING_FAILURE\",\n  \"remarks\": \"Unplanned downtime due to critical spindle bearing failure.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/downtime",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "downtime"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Traceability",
+			"item": [
+				{
+					"name": "Get Machine History",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/maintenance/history/{{machine_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "maintenance", "history", "{{machine_id}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

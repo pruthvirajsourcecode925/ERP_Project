@@ -1,0 +1,139 @@
+{
+  "info": {
+    "name": "AS9100D Dispatch Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Dispatch order lifecycle, shipping documents, release, and PDF download endpoints for the AS9100D ERP backend."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "sales_order_id", "value": "" },
+    { "key": "production_order_id", "value": "" },
+    { "key": "dispatch_order_id", "value": "" },
+    { "key": "coc_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Create Dispatch Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dispatch_number\": \"DSP-2026-0001\",\n  \"sales_order_id\": {{sales_order_id}},\n  \"certificate_of_conformance_id\": {{coc_id}},\n  \"dispatch_date\": \"2026-03-08\",\n  \"shipping_method\": \"Road\",\n  \"destination\": \"Customer Site\",\n  \"remarks\": \"Dispatch created from Postman\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/order", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "order"] }
+      }
+    },
+    {
+      "name": "List Dispatch Orders",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/order", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "order"] }
+      }
+    },
+    {
+      "name": "Add Dispatch Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dispatch_order_id\": {{dispatch_order_id}},\n  \"production_order_id\": {{production_order_id}},\n  \"line_number\": 1,\n  \"item_code\": \"FG-001\",\n  \"description\": \"Finished good\",\n  \"quantity\": \"10.000\",\n  \"uom\": \"Nos\",\n  \"lot_number\": \"LOT-001\",\n  \"is_traceability_verified\": true,\n  \"remarks\": \"Dispatch item\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/order/{{dispatch_order_id}}/item", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "order", "{{dispatch_order_id}}", "item"] }
+      }
+    },
+    {
+      "name": "Verify Checklist",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dispatch_order_id\": {{dispatch_order_id}},\n  \"checklist_item\": \"Packaging verified\",\n  \"requirement_reference\": \"DISP-CHK-01\",\n  \"status\": \"completed\",\n  \"remarks\": \"Checklist complete\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/order/{{dispatch_order_id}}/checklist", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "order", "{{dispatch_order_id}}", "checklist"] }
+      }
+    },
+    {
+      "name": "Generate Packing List",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"packing_list_number\": \"PL-2026-0001\",\n  \"dispatch_order_id\": {{dispatch_order_id}},\n  \"packed_date\": \"2026-03-08\",\n  \"package_count\": 1,\n  \"remarks\": \"Packed\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/packing-list", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "packing-list"] }
+      }
+    },
+    {
+      "name": "Generate Invoice",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"invoice_number\": \"INV-2026-0001\",\n  \"dispatch_order_id\": {{dispatch_order_id}},\n  \"invoice_date\": \"2026-03-08\",\n  \"currency\": \"INR\",\n  \"subtotal\": \"100.00\",\n  \"tax_amount\": \"18.00\",\n  \"total_amount\": \"118.00\",\n  \"remarks\": \"Invoice issued\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/invoice", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "invoice"] }
+      }
+    },
+    {
+      "name": "Generate Delivery Challan",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"challan_number\": \"DC-2026-0001\",\n  \"dispatch_order_id\": {{dispatch_order_id}},\n  \"issue_date\": \"2026-03-08\",\n  \"received_by\": \"Customer Stores\",\n  \"remarks\": \"Challan issued\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/challan", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "challan"] }
+      }
+    },
+    {
+      "name": "Release Dispatch",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/order/{{dispatch_order_id}}/ship", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "order", "{{dispatch_order_id}}", "ship"] }
+      }
+    },
+    {
+      "name": "Download Invoice PDF",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/report/invoice/{{dispatch_order_id}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "report", "invoice", "{{dispatch_order_id}}"] }
+      }
+    },
+    {
+      "name": "Download Challan PDF",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": { "raw": "{{baseUrl}}/api/v1/dispatch/report/challan/{{dispatch_order_id}}", "host": ["{{baseUrl}}"], "path": ["api", "v1", "dispatch", "report", "challan", "{{dispatch_order_id}}"] }
+      }
+    }
+  ]
+}

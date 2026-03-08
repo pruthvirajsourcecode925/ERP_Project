@@ -52,8 +52,8 @@ Defines the operational backend flow for authentication, admin-controlled user l
 - Module-assigned custom roles must be denied before assignment and allowed after admin assignment.
 
 ## Module Access Notes
-- Current business module keys include `sales`, `purchase`, `stores`, `engineering`, and `production`.
-- Placeholder module keys also exist for `quality`, `maintenance`, and `dispatch`, but access becomes meaningful only when those routers are implemented.
+- Current business module keys include `sales`, `purchase`, `stores`, `engineering`, `quality`, and `production`.
+- Placeholder module keys currently include `maintenance` and `dispatch`.
 - `users` and `roles` remain admin-governed APIs, not business-module self-service APIs.
 
 ## Traceability

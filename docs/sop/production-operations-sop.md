@@ -9,6 +9,7 @@ Defines the backend operating flow for production execution, inspection, rework 
 - Route card must be `Released`.
 - Production operations are expected to exist before operation execution starts.
 - If an operation is machine-linked, the machine must be active.
+- If the machine is tracked in the maintenance module and has status `UnderMaintenance`, operation start is blocked.
 
 ## Standard Flow
 1. Create machine master if required with `POST /api/v1/production/machine`.
@@ -48,6 +49,7 @@ Defines the backend operating flow for production execution, inspection, rework 
 - Route card not released -> production order create/start must fail.
 - Starting operation 20 before operation 10 completion must fail.
 - Inactive machine linked to an operation must block operation start.
+- Machine with maintenance status `UnderMaintenance` must block operation start.
 - Inactive machine in production log must block production output logging.
 - Failed inspection must create exactly one open rework order.
 - Rework close attempt before a later passed inspection must fail.
@@ -59,6 +61,7 @@ Defines the backend operating flow for production execution, inspection, rework 
 - Operator report aggregates jobs worked, completed operations, production quantity, and scrap.
 - Machine report aggregates operations, production quantity, scrap quantity, and operators used.
 - Job report shows planned quantity, produced quantity, scrap quantity, remaining quantity, and operation status counts.
+- Date filters for batch/operator/machine reports are interpreted as full-day boundaries in UTC: `start_date 00:00:00` (inclusive) to `end_date + 1 day 00:00:00` (exclusive).
 
 ## Traceability
 - Production logs carry batch, operator, machine, and timestamp traceability fields.

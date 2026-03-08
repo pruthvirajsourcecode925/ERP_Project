@@ -157,7 +157,9 @@ class ProductionOperation(Base, ProductionAuditMixin):
     )
 
     production_order: Mapped[ProductionOrder] = relationship(back_populates="operations")
-    machine: Mapped[Machine | None] = relationship(back_populates="operations")
+    machine: Mapped[Machine | None] = relationship(
+        "Machine", back_populates="operations"
+    )
     operators: Mapped[list[OperationOperator]] = relationship(
         back_populates="production_operation", cascade="all, delete-orphan"
     )
@@ -278,7 +280,9 @@ class ProductionLog(Base, ProductionAuditMixin):
     operation: Mapped[ProductionOperation] = relationship(back_populates="logs")
     recorder: Mapped[object] = relationship("User", foreign_keys=[recorded_by])
     operator_user: Mapped[object | None] = relationship("User", foreign_keys=[operator_user_id])
-    machine: Mapped[Machine | None] = relationship(back_populates="logs", foreign_keys=[machine_id])
+    machine: Mapped[Machine | None] = relationship(
+        "Machine", back_populates="logs", foreign_keys=[machine_id]
+    )
 
 
 class FAITrigger(Base, ProductionAuditMixin):

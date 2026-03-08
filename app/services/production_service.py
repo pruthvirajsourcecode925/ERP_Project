@@ -3,12 +3,16 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.role import Role
 from app.models.user import User
 from app.modules.engineering.models import RouteCard, RouteCardStatus
+from app.modules.quality.services import (
+    QualityBusinessRuleError,
+    validate_operation_inspection_required as quality_validate_operation_inspection_required,
+)
 from app.modules.production.models import (
     FAITrigger,
     FAITriggerStatus,
@@ -141,6 +145,22 @@ def _require_active_machine(db: Session, machine_id: int) -> Machine:
     return machine
 
 
+def validate_machine_available(db: Session, machine_id: int) -> None:
+    maintenance_status = db.execute(
+        text(
+            """
+            SELECT status
+            FROM maintenance_machines
+            WHERE id = :machine_id AND is_deleted = FALSE
+            """
+        ),
+        {"machine_id": machine_id},
+    ).scalar_one_or_none()
+
+    if maintenance_status == "UnderMaintenance":
+        raise ProductionBusinessRuleError("ProductionOperation cannot start while machine is UnderMaintenance")
+
+
 def _get_rework_order(db: Session, rework_order_id: int) -> ReworkOrder:
     rework_order = db.scalar(
         select(ReworkOrder).where(
@@ -269,6 +289,15 @@ def _create_fai_trigger_if_applicable(
     )
     db.add(fai_trigger)
     return fai_trigger
+
+
+def validate_operation_inspection_required(db: Session, *, operation_id: int) -> InProcessInspection:
+    _get_production_operation(db, operation_id)
+
+    try:
+        return quality_validate_operation_inspection_required(db, production_operation_id=operation_id)
+    except QualityBusinessRuleError as exc:
+        raise ProductionBusinessRuleError("Operation cannot be completed without in-process inspection.") from exc
 
 
 def create_production_order(
@@ -489,6 +518,7 @@ def start_operation(
 
     if operation.machine_id is not None:
         _require_active_machine(db, operation.machine_id)
+        validate_machine_available(db, operation.machine_id)
 
     previous_incomplete_operation = _get_previous_incomplete_operation(db, operation)
     if previous_incomplete_operation is not None:
@@ -727,12 +757,7 @@ def complete_operation(
     if operation.started_at is None:
         raise ProductionBusinessRuleError("Operation must be started before completion")
 
-    latest_inspection = _get_latest_inspection(db, production_operation_id)
-    if not latest_inspection:
-        raise ProductionBusinessRuleError("Operation cannot be completed without in-process inspection")
-
-    if latest_inspection.inspection_result != InspectionResult.PASS:
-        raise ProductionBusinessRuleError("Operation cannot be completed unless inspection result is Pass")
+    validate_operation_inspection_required(db, operation_id=production_operation_id)
 
     operation.status = ProductionOperationStatus.COMPLETED
     operation.completed_at = _utc_now()

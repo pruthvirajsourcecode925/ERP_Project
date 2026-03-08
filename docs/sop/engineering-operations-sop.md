@@ -1,63 +1,52 @@
-# Engineering Module - Standard Operating Procedures (SOP)
+# Engineering Operations SOP (Backend API)
 
 ## Purpose
-Defines the standard API and process flow for route card, drawing/document, and engineering change management with traceability and validation controls.
-# Engineering Module - Standard Operating Procedures (SOP)
-
-## 1. Route Card Management
-- Create, edit, and release route cards for each job or batch.
-- Ensure all required process steps and quality checks are included.
-- Route cards must be approved before use in production.
-- Obsolete route cards when superseded, but retain for traceability.
-
-## 2. Drawing/Document Management
-- Upload and version control all engineering drawings and documents.
-- Link documents to relevant jobs, parts, or route cards.
-- Restrict editing to authorized users only.
-
-## 3. Engineering Change Requests (ECR)
-- Submit ECRs for any process, design, or document change.
-- Review and approve ECRs with cross-functional team.
-- Update affected route cards and documents after approval.
-
-## 4. Traceability
-- Maintain audit logs for all changes to route cards and documents.
-- Link route cards to production batches and quality records.
-- Ensure all changes are reviewable and reversible.
+Defines the engineering backend flow for drawing control, revision management, route card release, and route card document traceability.
 
 ## Preconditions
-- Authenticated user with Engineering or Admin role.
-- Job or batch must exist for route card creation.
+- Authenticated user with `Engineering` or `Admin` role.
+- A valid sales order and drawing revision are available before creating a route card.
+- Route card file upload is mandatory during route card creation.
 
 ## Standard Flow
-1. **Route Card Management**
-	- Create: `POST /api/v1/engineering/route-card` (job/batch, process steps, quality checks)
-	- Edit: `PATCH /api/v1/engineering/route-card/{id}`
-	- Approve/Release: `POST /api/v1/engineering/route-card/{id}/approve`
-	- Obsolete: `PATCH /api/v1/engineering/route-card/{id}/obsolete` (retained for traceability)
-2. **Drawing/Document Management**
-	- Upload: `POST /api/v1/engineering/document/upload` (file, metadata)
-	- Version: `POST /api/v1/engineering/document/{id}/version`
-	- Link: `POST /api/v1/engineering/document/{id}/link` (job/part/route card)
-	- Edit restricted to authorized users
-3. **Engineering Change Requests (ECR)**
-	- Submit: `POST /api/v1/engineering/ecr` (change details)
-	- Review/Approve: `POST /api/v1/engineering/ecr/{id}/approve`
-	- Update affected route cards/documents after approval
+1. Create drawing: `POST /api/v1/engineering/drawing`.
+2. Update drawing if needed: `PATCH /api/v1/engineering/drawing/{drawing_id}`.
+3. Create drawing revision: `POST /api/v1/engineering/drawing/{drawing_id}/revision`.
+4. Optionally update non-current, non-approved revision:
+	- `PATCH /api/v1/engineering/drawing/{drawing_id}/revision/{revision_id}`.
+5. Create route card with multipart upload:
+	- `POST /api/v1/engineering/route-card`
+	- Required form fields: `route_number`, `drawing_revision_id`, `sales_order_id`, `file`.
+6. Add operations to route card:
+	- `POST /api/v1/engineering/route-card/{route_card_id}/operation`.
+7. Review route card and operations:
+	- `GET /api/v1/engineering/route-card`
+	- `GET /api/v1/engineering/route-card/{route_card_id}`.
+8. Release route card:
+	- `POST /api/v1/engineering/route-card/{route_card_id}/release`.
+9. Download route card document:
+	- By id: `GET /api/v1/engineering/route-card/{route_card_id}/document/download`
+	- By traceability key: `GET /api/v1/engineering/route-card/document/download?traceability={route_number_or_so_or_po}`.
+10. Mark obsolete when superseded:
+	 - `PATCH /api/v1/engineering/route-card/{route_card_id}/obsolete`.
 
 ## Control Rules
-- Only authorized users can edit or approve route cards/documents.
-- Obsoleted route cards are retained for traceability.
-- ECRs require cross-functional approval before implementation.
-- All changes are audit-logged.
+- Route card upload cannot be empty.
+- Route card creation enforces a valid drawing revision and sales-order linkage.
+- Current or approved drawing revisions cannot be edited.
+- Route card documents are constrained to `imports/route_cards` for secure downloads.
+- Release operations are role-protected and audit logged.
 
 ## Validation Checklist
-- Route card creation rejects missing process steps or quality checks.
-- Document upload rejects missing metadata or invalid file types.
-- ECR submission requires detailed change description.
-- Approval actions require proper authorization.
+- `POST /api/v1/engineering/route-card` fails when file is missing or empty.
+- `GET /api/v1/engineering/route-card/{id}/document/download` returns `404` when file metadata exists but file is missing.
+- `PATCH /api/v1/engineering/drawing/{drawing_id}/revision/{revision_id}` rejects current/approved revisions.
+- `POST /api/v1/engineering/route-card/{id}/release` transitions route card state to `released`.
 
-## Traceability & Audit
-- All changes to route cards, documents, and ECRs are logged with user, timestamp, and action.
-- Route cards are linked to production batches and quality records.
-- All changes are reviewable and reversible for compliance.
+## Traceability Notes
+- Route card metadata persists:
+  - `route_card_file_name`
+  - `route_card_file_path`
+  - `route_card_file_uploaded_at`
+  - `route_card_file_content_type`
+- Route card document retrieval by traceability supports search across route number and linked order references.

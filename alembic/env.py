@@ -10,7 +10,41 @@ from app.models.user import User
 from app.models.audit_log import AuditLog
 from app.models.refresh_token import RefreshToken
 from app.models.oauth_state import OAuthState
+from app.modules.admin.models_alert_settings import AlertSettings
 from app.modules.sales import Customer, Enquiry, ContractReview, Quotation, QuotationItem, CustomerPOReview, SalesOrder
+from app.modules.purchase import Supplier, PurchaseOrder, PurchaseOrderItem
+from app.modules.dispatch import (
+    DispatchOrder,
+    DispatchItem,
+    DispatchChecklist,
+    PackingList,
+    Invoice,
+    DeliveryChallan,
+    ShipmentTracking,
+)
+from app.modules.engineering import (
+    Drawing,
+    DrawingRevision,
+    RouteCard,
+    RouteOperation,
+    SpecialProcess,
+    RouteOperationSpecialProcess,
+    EngineeringReleaseRecord,
+)
+from app.modules.stores.models import GRN, GRNItem
+from app.modules.production.models import ProductionOrder, ProductionOperation, InProcessInspection
+from app.modules.quality.models import (
+    IncomingInspection,
+    FinalInspection,
+    FAIReport,
+    NCR,
+    CAPA,
+    RootCauseAnalysis,
+    Gauge,
+    AuditPlan,
+    AuditReport,
+    ManagementReviewMeeting,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -27,6 +61,9 @@ target_metadata = Base.metadata
 # config.get_main_option("key")
 def get_url():
     return settings.DATABASE_URL
+
+
+config.set_main_option("sqlalchemy.url", get_url())
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode."""

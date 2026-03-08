@@ -6,3 +6,5 @@ __pycache__/
 exports/
 imports/route_cards/*
 !imports/route_cards/.gitkeep
+storage/quality_reports/
+storage/dispatch_documents/

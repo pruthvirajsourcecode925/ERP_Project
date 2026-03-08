@@ -2,15 +2,38 @@
   "info": {
     "name": "AS9100D Production Lifecycle",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Production flow: production log, reporting, traceability, and related endpoints."
+    "description": "Production endpoints aligned with current API: machine master, production log, and report suite."
   },
   "variable": [
     { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
     { "key": "access_token", "value": "" },
-    { "key": "production_log_id", "value": "" },
-    { "key": "batch_id", "value": "" }
+    { "key": "production_order_id", "value": "1" },
+    { "key": "operation_id", "value": "1" },
+    { "key": "operator_id", "value": "1" },
+    { "key": "machine_id", "value": "1" },
+    { "key": "batch_number", "value": "BATCH-POSTMAN-001" },
+    { "key": "report_start_date", "value": "2026-03-01" },
+    { "key": "report_end_date", "value": "2026-03-31" }
   ],
   "item": [
+    {
+      "name": "List Machines",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/machine?skip=0&limit=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "machine"],
+          "query": [
+            { "key": "skip", "value": "0" },
+            { "key": "limit", "value": "20" }
+          ]
+        }
+      }
+    },
     {
       "name": "Create Production Log",
       "request": {
@@ -21,12 +44,86 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"batch_id\": \"BATCH-POSTMAN-001\",\n  \"quantity\": 100,\n  \"status\": \"Started\"\n}"
+          "raw": "{\n  \"production_order_id\": {{production_order_id}},\n  \"operation_id\": {{operation_id}},\n  \"produced_quantity\": \"5.000\",\n  \"scrap_quantity\": \"1.000\",\n  \"recorded_at\": \"2026-03-08T09:00:00Z\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/api/v1/production/logs",
+          "raw": "{{baseUrl}}/api/v1/production/log",
           "host": ["{{baseUrl}}"],
-          "path": ["api", "v1", "production", "logs"]
+          "path": ["api", "v1", "production", "log"]
+        }
+      }
+    },
+    {
+      "name": "Batch Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/report/batch?batch_number={{batch_number}}&start_date={{report_start_date}}&end_date={{report_end_date}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "report", "batch"],
+          "query": [
+            { "key": "batch_number", "value": "{{batch_number}}" },
+            { "key": "start_date", "value": "{{report_start_date}}" },
+            { "key": "end_date", "value": "{{report_end_date}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Operator Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/report/operator?operator_id={{operator_id}}&start_date={{report_start_date}}&end_date={{report_end_date}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "report", "operator"],
+          "query": [
+            { "key": "operator_id", "value": "{{operator_id}}" },
+            { "key": "start_date", "value": "{{report_start_date}}" },
+            { "key": "end_date", "value": "{{report_end_date}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Machine Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/report/machine?machine_id={{machine_id}}&start_date={{report_start_date}}&end_date={{report_end_date}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "report", "machine"],
+          "query": [
+            { "key": "machine_id", "value": "{{machine_id}}" },
+            { "key": "start_date", "value": "{{report_start_date}}" },
+            { "key": "end_date", "value": "{{report_end_date}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Job Progress Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/production/report/job?production_order_id={{production_order_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "production", "report", "job"],
+          "query": [
+            { "key": "production_order_id", "value": "{{production_order_id}}" }
+          ]
         }
       },
       "event": [
@@ -35,9 +132,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
-              "const data = pm.response.json();",
-              "pm.environment.set('production_log_id', data.id);"
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
         }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import case, func, select
@@ -30,11 +30,18 @@ def _validate_date_range(*, start_date: date, end_date: date) -> None:
         raise ProductionBusinessRuleError("end_date must be greater than or equal to start_date")
 
 
+def _build_log_datetime_bounds(*, start_date: date, end_date: date) -> tuple[datetime, datetime]:
+    start_datetime = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+    end_datetime = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    return start_datetime, end_datetime
+
+
 def _apply_log_date_filters(statement, *, start_date: date, end_date: date):
+    start_datetime, end_datetime = _build_log_datetime_bounds(start_date=start_date, end_date=end_date)
     return statement.where(
         ProductionLog.is_deleted.is_(False),
-        func.date(ProductionLog.recorded_at) >= start_date,
-        func.date(ProductionLog.recorded_at) <= end_date,
+        ProductionLog.recorded_at >= start_datetime,
+        ProductionLog.recorded_at < end_datetime,
     )
 
 

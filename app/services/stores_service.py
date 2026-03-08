@@ -7,6 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
+from app.modules.quality.services import (
+    QualityBusinessRuleError,
+    validate_grn_inspection_required as quality_validate_grn_inspection_required,
+)
 from app.modules.purchase.models import PurchaseOrder, PurchaseOrderStatus
 from app.modules.stores.models import (
     BatchInventory,
@@ -102,6 +106,15 @@ def _validate_batch_number_format(batch_number: str) -> str:
             )
 
     return " / ".join(parts)
+
+
+def validate_grn_inspection_required(db: Session, *, grn_item_id: int) -> None:
+    grn_item = _get_grn_item(db, grn_item_id)
+
+    try:
+        quality_validate_grn_inspection_required(db, grn_id=grn_item.grn_id, grn_item_id=grn_item_id)
+    except QualityBusinessRuleError as exc:
+        raise StoresBusinessRuleError("Material cannot enter inventory until incoming inspection is accepted.") from exc
 
 
 def create_grn(

@@ -1,0 +1,405 @@
+{
+  "info": {
+    "name": "AS9100D Quality Lifecycle",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Quality flow: NCR/CAPA, gauge and audit records, traceability, and report downloads."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "ncr_reference_id", "value": "1" },
+    { "key": "ncr_id", "value": "" },
+    { "key": "capa_id", "value": "" },
+    { "key": "auditor_id", "value": "1" },
+    { "key": "responsible_person_id", "value": "1" },
+    { "key": "audit_plan_id", "value": "" },
+    { "key": "audit_report_id", "value": "" },
+    { "key": "production_order_id", "value": "1" },
+    { "key": "fai_id", "value": "" },
+    { "key": "fir_inspection_id", "value": "1" },
+    { "key": "customer_id", "value": "1" },
+    { "key": "batch_number", "value": "DRW-1001 / SO-25-001 / CUST-A / HEAT-77" }
+  ],
+  "item": [
+    {
+      "name": "Create NCR",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('ncr_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reference_type\": \"ProductionOrder\",\n  \"reference_id\": {{ncr_reference_id}},\n  \"description\": \"Postman QA non-conformance sample\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/ncr",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "ncr"]
+        }
+      }
+    },
+    {
+      "name": "List NCR",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/ncr",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "ncr"]
+        }
+      }
+    },
+    {
+      "name": "Create CAPA",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('capa_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ncr_id\": {{ncr_id}},\n  \"action_type\": \"Corrective\",\n  \"responsible_person\": {{responsible_person_id}},\n  \"target_date\": \"2026-03-31\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/capa",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "capa"]
+        }
+      }
+    },
+    {
+      "name": "List CAPA",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/capa",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "capa"]
+        }
+      }
+    },
+    {
+      "name": "Create Root Cause Analysis",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ncr_id\": {{ncr_id}},\n  \"method\": \"5Why\",\n  \"analysis_text\": \"Root cause identified through 5-Why review\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/root-cause",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "root-cause"]
+        }
+      }
+    },
+    {
+      "name": "Create Gauge",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"gauge_code\": \"G-POSTMAN-001\",\n  \"gauge_name\": \"Digital Vernier\",\n  \"last_calibration_date\": \"2026-03-01\",\n  \"next_calibration_due\": \"2026-09-01\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/gauge",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "gauge"]
+        }
+      }
+    },
+    {
+      "name": "List Gauge",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/gauge",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "gauge"]
+        }
+      }
+    },
+    {
+      "name": "Create Audit Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('audit_plan_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"audit_area\": \"Stores Incoming Inspection\",\n  \"planned_date\": \"2026-03-20\",\n  \"auditor\": {{auditor_id}}\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/audit-plan",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "audit-plan"]
+        }
+      }
+    },
+    {
+      "name": "Create Audit Report",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('audit_report_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"audit_plan_id\": {{audit_plan_id}},\n  \"findings\": \"No major non-conformance found\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/audit-report",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "audit-report"]
+        }
+      }
+    },
+    {
+      "name": "Create FAI",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "const data = pm.response.json();",
+              "pm.environment.set('fai_id', data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"production_order_id\": {{production_order_id}},\n  \"drawing_number\": \"DRW-QA-001\",\n  \"revision\": \"A\",\n  \"part_number\": \"PN-QA-001\",\n  \"attachment_path\": \"/tmp/fai-qa.pdf\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/fai",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "fai"]
+        }
+      }
+    },
+    {
+      "name": "Get FAI",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/fai/{{fai_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "fai", "{{fai_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Trace by Batch",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/trace/batch/{{batch_number}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "trace", "batch", "{{batch_number}}"]
+        }
+      }
+    },
+    {
+      "name": "Trace by NCR",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/trace/ncr/{{ncr_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "trace", "ncr", "{{ncr_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Trace by Customer",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/trace/customer/{{customer_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "trace", "customer", "{{customer_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download NCR Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/ncr/{{ncr_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "ncr", "{{ncr_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download CAPA Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/capa/{{capa_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "capa", "{{capa_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download Audit Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/audit/{{audit_report_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "audit", "{{audit_report_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download FAI Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/fai/{{fai_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "fai", "{{fai_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download FIR Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/fir/{{fir_inspection_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "fir", "{{fir_inspection_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Download Traceability Report",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/quality/report/trace/{{batch_number}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "quality", "report", "trace", "{{batch_number}}"]
+        }
+      }
+    }
+  ]
+}

@@ -10,7 +10,7 @@ erDiagram
     users ||--o{ operation_operators : created_by_updated_by_operator
     users ||--o{ in_process_inspections : created_by_updated_by_inspected_by
     users ||--o{ rework_orders : created_by_updated_by
-    users ||--o{ production_logs : created_by_updated_by_recorded_by
+    users ||--o{ production_logs : created_by_updated_by_recorded_by_operator
     users ||--o{ fai_triggers : created_by_updated_by
 
     sales_orders ||--o{ production_orders : released_into
@@ -24,6 +24,7 @@ erDiagram
     production_operations ||--o{ rework_orders : reworked_by
     production_orders ||--o{ production_logs : output_logged
     production_operations ||--o{ production_logs : operation_logged
+    machines ||--o{ production_logs : logged_on_machine
     production_orders ||--o{ fai_triggers : fai_scope
     production_operations ||--o{ fai_triggers : fai_operation
 
@@ -114,8 +115,13 @@ erDiagram
         bigint id PK
         bigint production_order_id FK
         bigint operation_id FK
+        varchar batch_number
+        int operator_user_id FK "nullable"
+        bigint machine_id FK "nullable"
         numeric produced_quantity
         numeric scrap_quantity
+        varchar scrap_reason "nullable"
+        varchar shift "nullable"
         int recorded_by FK
         timestamptz recorded_at
         timestamptz created_at
@@ -156,6 +162,8 @@ erDiagram
   - `production_logs.production_order_id -> production_orders.id`
   - `production_logs.operation_id -> production_operations.id`
   - `production_logs.recorded_by -> users.id`
+    - `production_logs.operator_user_id -> users.id`
+    - `production_logs.machine_id -> machines.id`
   - `fai_triggers.production_order_id -> production_orders.id`
   - `fai_triggers.operation_id -> production_operations.id`
 - Check constraints recommended for implementation:
